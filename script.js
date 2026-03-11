@@ -297,10 +297,10 @@ const dropText = document.getElementById("drop-text");
 const dropHint = document.getElementById("drop-hint");
 const btnImage = document.getElementById("btn-image");
 const btnVideo = document.getElementById("btn-video");
-const securityPill = document.getElementById("security-pill");
-const performanceSection = document.getElementById("performance-section");
-const heatmapImage = document.getElementById("heatmap-image");
-const confusionInsightsList = document.getElementById("confusion-insights-list");
+const securityPill = document.getElementById("security-pill");  // may be null — safe to use with ?.
+const performanceSection = document.getElementById("performance-section");  // may be null
+const heatmapImage = document.getElementById("heatmap-image");  // may be null
+const confusionInsightsList = document.getElementById("confusion-insights-list");  // may be null
 
 // ─── Result card state refs ─────────────────────────────────────────
 const emptyState = document.getElementById("empty-state");
@@ -716,9 +716,9 @@ btnPredict.addEventListener("click", async () => {
   if (!currentAuthUser) {
     let freePredictions = parseInt(localStorage.getItem("free_predictions") || "0", 10);
     if (freePredictions >= 3) {
-      alert("You have reached your limit of 3 free predictions. Please sign in or sign up to continue.");
       showAuthView("login");
       authModal.classList.add("open");
+      showAuthError("You've used all 3 free predictions. Please sign in to continue.");
       return;
     }
   }
@@ -739,30 +739,54 @@ btnPredict.addEventListener("click", async () => {
       credentials: 'include'
     });
 
-    const data = await response.json();
+    // Check if response is JSON before parsing (cold-start Render returns HTML 502)
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      // Server returned HTML (e.g. 502 gateway page from Render cold start)
+      showError("Server is starting up — please wait 30 seconds and try again.");
+      hideLoading();
+      return;
+    }
 
-    if (!response.ok || (data.error && !data.annotated_image)) {
-      showError(data.error || `Server error (${response.status}).`);
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonErr) {
+      showError("Server is starting up — please wait 30 seconds and try again.");
+      hideLoading();
+      return;
+    }
+
+    if (!response.ok) {
+      // Handle free limit reached
+      if (data.error === "free_limit_reached") {
+        showError("You've used all 3 free predictions. Please sign in to continue.");
+        showAuthView("login");
+        authModal.classList.add("open");
+      } else {
+        showError(data.error || `Server error (${response.status}).`);
+      }
+    } else if (data.error && !data.annotated_image && !data.shot) {
+      // Pure error with no usable result
+      showError(data.error);
     } else {
       renderResult(data, currentMode === "video");
+
+      // If there was a partial error (no skeleton detected) show message in result
       if (data.error && !data.annotated_image) {
-        // partial error with no image: show no-skeleton message
         document.getElementById("no-skeleton-result").style.display = "block";
         document.getElementById("annotated-image-result").style.display = "none";
       }
 
-      // Increment free predictions if not logged in
+      // Increment free predictions counter (client-side fallback)
       if (!currentAuthUser) {
         let freePredictions = parseInt(localStorage.getItem("free_predictions") || "0", 10);
         localStorage.setItem("free_predictions", freePredictions + 1);
       }
     }
   } catch (err) {
-    const eMsg = (err.message || "").toLowerCase();
-    if (eMsg.includes('<!doctype') || eMsg.includes('not valid json') || eMsg.includes('unexpected token')) {
-      showError("Server is starting up — please wait 30 seconds and try again.");
-    } else if (err.name === "TypeError") {
-      showError("Cannot connect to server. Please try again shortly.");
+    if (err.name === "TypeError" || err.message?.includes("fetch")) {
+      showError("Cannot connect to server. Make sure the Flask server is running on port 5000.");
     } else {
       showError(`Unexpected error: ${err.message}`);
     }
@@ -858,16 +882,16 @@ function updateAuthUI(user) {
   currentAuthUser = user;
   const freeEl = document.getElementById("free-counter");
   if (user) {
-    btnShowAuth.style.display = "none";
-    userProfile.style.display = "flex";
-    userDisplayName.textContent = user.email || user.mobile || "User";
+    if (btnShowAuth) btnShowAuth.style.display = "none";
+    if (userProfile) userProfile.style.display = "flex";
+    if (userDisplayName) userDisplayName.textContent = user.email || user.mobile || "User";
     const avatar = document.getElementById("user-avatar");
     if (avatar) avatar.textContent = (user.email || user.mobile || "U")[0].toUpperCase();
     if (freeEl) freeEl.style.display = "none";
     if (securityPill) securityPill.style.display = "flex";
   } else {
-    btnShowAuth.style.display = "block";
-    userProfile.style.display = "none";
+    if (btnShowAuth) btnShowAuth.style.display = "block";
+    if (userProfile) userProfile.style.display = "none";
     const used = parseInt(localStorage.getItem("free_predictions") || "0", 10);
     const remaining = Math.max(0, 3 - used);
     if (freeEl) {
@@ -960,6 +984,11 @@ formOtp.addEventListener("submit", async e => {
   e.preventDefault();
   const otp = Array.from(otpInputs).map(i => i.value).join("");
 
+  if (otp.length < 6) {
+    showAuthError("Please enter all 6 digits of the OTP.");
+    return;
+  }
+
   if (authState.flow === 'reset') {
     // Store OTP and show the set-new-password view.
     // The backend will validate the OTP when /auth/reset-password is called.
@@ -980,11 +1009,47 @@ formOtp.addEventListener("submit", async e => {
   if (res.ok) {
     authModal.classList.remove("open");
     checkAuthStatus();
-    alert("Login Successful! Enjoy CRICSHOT!");
+    showSuccessToast("Login Successful! Enjoy CRICSHOT! 🏏");
   } else {
     showAuthError("Invalid or expired OTP. Please try again.");
   }
 });
+
+// ─── Resend OTP handler ─────────────────────────────────────────────
+const btnResendOtp = document.getElementById("btn-resend-otp");
+if (btnResendOtp) {
+  btnResendOtp.addEventListener("click", async () => {
+    if (!authState.userId) {
+      showAuthError("Session expired. Please start login again.");
+      showAuthView("login");
+      return;
+    }
+    btnResendOtp.disabled = true;
+    btnResendOtp.textContent = "Sending...";
+    try {
+      const res = await fetch(`${API_BASE}/auth/resend-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: authState.userId }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        btnResendOtp.textContent = "Resent!";
+        if (data.otp_debug) showOtpToast(data.otp_debug);
+        setTimeout(() => { btnResendOtp.textContent = "Resend code"; btnResendOtp.disabled = false; }, 30000);
+      } else {
+        showAuthError(data.error || "Failed to resend OTP.");
+        btnResendOtp.textContent = "Resend code";
+        btnResendOtp.disabled = false;
+      }
+    } catch {
+      showAuthError("Could not connect to server.");
+      btnResendOtp.textContent = "Resend code";
+      btnResendOtp.disabled = false;
+    }
+  });
+}
 
 formForgot.addEventListener("submit", async e => {
   e.preventDefault();
@@ -1107,4 +1172,25 @@ function showOtpToast(otp) {
   setTimeout(() => {
     if (toast.parentElement) toast.remove();
   }, 30000);
+}
+
+// ─── Success Toast ───────────────────────────────────────────────────
+function showSuccessToast(msg) {
+  const existing = document.querySelectorAll(".success-toast");
+  existing.forEach(t => t.remove());
+
+  const toast = document.createElement("div");
+  toast.className = "success-toast";
+  toast.style.cssText = `
+    position:fixed;bottom:20px;right:20px;
+    background:linear-gradient(135deg,#00e88a,#00c070);
+    color:#0d1b2a;padding:14px 22px;border-radius:10px;
+    font-size:14px;font-weight:600;z-index:99999;
+    box-shadow:0 4px 20px rgba(0,232,138,0.35);
+    animation:slideInRight 0.3s ease;
+  `;
+  toast.textContent = msg;
+  toast.addEventListener("click", () => toast.remove());
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 4000);
 }

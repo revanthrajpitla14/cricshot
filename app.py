@@ -638,6 +638,32 @@ def logout():
     return jsonify({"message": "Logged out"})
 
 
+@app.route("/auth/resend-otp", methods=["POST"])
+def resend_otp():
+    """Resend OTP to the user (for the 'Resend code' button on the OTP screen)."""
+    data    = request.json
+    user_id = data.get("user_id")
+
+    try:
+        user_id = int(str(user_id))
+    except Exception:
+        return jsonify({"error": "Invalid user ID"}), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    otp = generate_otp()
+    user.otp_code   = otp
+    user.otp_expiry = datetime.datetime.now() + datetime.timedelta(minutes=10)
+    db.session.commit()
+
+    log_activity(user.id, "otp_sent", detail="resend")
+    send_otp(user, otp)
+
+    return jsonify({"message": "OTP resent", "otp_debug": otp})
+
+
 # ═══════════════════════════════════════════════════════════════════════
 #  PREDICTION ROUTES
 # ═══════════════════════════════════════════════════════════════════════
@@ -680,7 +706,7 @@ def _log_prediction(result: dict, file_type: str, session_token: str = None):
             anon = AnonymousSession.query.filter_by(session_token=session_token).first()
             if anon:
                 anon.prediction_count += 1
-                anon.last_used = datetime.datetime.utcnow()
+                anon.last_used = datetime.datetime.now(datetime.timezone.utc)
 
         db.session.commit()
     except Exception:
