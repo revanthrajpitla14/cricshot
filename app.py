@@ -865,51 +865,180 @@ def api_predict_frame():
 
 @app.route("/admin/users")
 def admin_users():
-    """Simple admin view to see all registered users and their details."""
+    """Professional admin view to see all registered users and their details."""
     users = User.query.order_by(User.id.desc()).all()
     html = """
-    <html>
+    <!DOCTYPE html>
+    <html lang="en">
     <head>
-        <title>Admin - User Details</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CRICSHOT Server Admin</title>
+        <!-- DataTables CSS -->
+        <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+        <!-- Bootstrap CSS for structure -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b1a35; color: #fff; padding: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; background: rgba(255,255,255,0.05); }
-            th, td { border: 1px solid rgba(0, 232, 138, 0.3); padding: 12px; text-align: left; }
-            th { background: rgba(0, 232, 138, 0.1); color: #00e88a; }
-            .btn-reset { background: #ff4d6d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-            .btn-reset:hover { background: #ff2a50; }
-            a { color: #00e88a; text-decoration: none; }
-            a:hover { text-decoration: underline; }
+            :root {
+                --theme-bg: #0b1a35;
+                --theme-card: #142a54;
+                --theme-accent: #00e88a;
+                --theme-text: #e2e8f0;
+                --theme-border: rgba(0, 232, 138, 0.3);
+            }
+            body { 
+                font-family: 'Inter', -apple-system, sans-serif; 
+                background: var(--theme-bg); 
+                color: var(--theme-text); 
+                padding-bottom: 50px;
+                min-height: 100vh;
+            }
+            .admin-container {
+                max-width: 1300px;
+                margin: 40px auto;
+                padding: 30px;
+                background: var(--theme-card);
+                border-radius: 16px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                border: 1px solid rgba(255,255,255,0.05);
+            }
+            .admin-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                border-bottom: 1px solid var(--theme-border);
+                padding-bottom: 20px;
+            }
+            .admin-title {
+                color: var(--theme-accent);
+                font-weight: 800;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            .btn-reset { 
+                background: #ff4d6d; 
+                color: white; 
+                border: none; 
+                padding: 10px 20px; 
+                border-radius: 8px; 
+                font-weight: 600; 
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .btn-reset:hover { 
+                background: #ff2a50; 
+                transform: translateY(-2px);
+                box-shadow: 0 4px 15px rgba(255, 77, 109, 0.4);
+            }
+            .btn-back {
+                color: var(--theme-text);
+                text-decoration: none;
+                font-weight: 500;
+                transition: color 0.2s;
+            }
+            .btn-back:hover {
+                color: var(--theme-accent);
+            }
+            
+            /* DataTables Dark Theme Overrides */
+            .table { color: var(--theme-text) !important; border-color: rgba(255,255,255,0.1) !important; }
+            .table-striped>tbody>tr:nth-of-type(odd)>* { color: var(--theme-text); background-color: rgba(255,255,255,0.02); }
+            table.dataTable tbody tr { background-color: transparent !important; }
+            .table th { border-bottom-color: var(--theme-border) !important; color: var(--theme-accent); font-weight: 600; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px; }
+            .table td { vertical-align: middle; border-color: rgba(255,255,255,0.05); }
+            .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter, .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_processing, .dataTables_wrapper .dataTables_paginate {
+                color: var(--theme-text) !important;
+                margin-bottom: 15px;
+            }
+            .dataTables_wrapper .dataTables_filter input { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 6px; padding: 5px 10px; margin-left: 10px; }
+            .dataTables_wrapper .dataTables_filter input:focus { outline: none; border-color: var(--theme-accent); }
+            .page-item.active .page-link { background-color: var(--theme-accent); border-color: var(--theme-accent); color: #000; font-weight: 600;}
+            .page-link { background-color: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: var(--theme-text); }
+            .page-link:hover { background-color: rgba(255,255,255,0.1); }
+            
+            .badge-verified { background: rgba(0, 232, 138, 0.2); color: #00e88a; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+            .badge-unverified { background: rgba(255, 77, 109, 0.2); color: #ff4d6d; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+            .hash-cell { font-family: monospace; font-size: 0.8rem; color: #8892b0; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         </style>
     </head>
     <body>
-        <h2>🛡️ CRICSHOT Admin Panel</h2>
-        <p><a href="/">&larr; Back to App</a></p>
-        
-        <form method="POST" action="/admin/database/reset" onsubmit="return confirm('WARNING: This will delete ALL users and predictions. Are you strictly sure you want to refresh the database?');">
-            <button type="submit" class="btn-reset">⚠️ Refresh / Wipe Database</button>
-        </form>
+        <div class="admin-container">
+            <div class="admin-header">
+                <div>
+                    <h2 class="admin-title">🛡️ Database Control Panel</h2>
+                    <a href="/" class="btn-back mt-2 d-inline-block">&larr; Return to Application</a>
+                </div>
+                <form method="POST" action="/admin/database/reset" onsubmit="return confirm('CRITICAL WARNING:\\n\\nThis will completely WIPE the SQLite database.\\nALL users and historical data will be lost.\\n\\nAre you absolutely sure you want to proceed?');">
+                    <button type="submit" class="btn-reset">
+                        <svg xmlns="http://www.w3.org/Form" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
+                        Factory Reset Database
+                    </button>
+                </form>
+            </div>
 
-        <h3>Registered Users</h3>
-        <table>
-            <tr>
-                <th>ID</th><th>Name</th><th>Email</th><th>Mobile</th><th>Fav Sport</th><th>Password Hash</th><th>Verified</th>
-            </tr>
+            <div class="table-responsive">
+                <table id="usersTable" class="table table-striped w-100">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Full Name</th>
+                            <th>Email Address</th>
+                            <th>Mobile No.</th>
+                            <th>Favourite Sport</th>
+                            <th>Password Hash</th>
+                            <th>Registered</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
     """
     for u in users:
+        date_str = u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "Unknown"
         html += f"""
-            <tr>
-                <td>{u.id}</td>
-                <td>{u.name or '-'}</td>
-                <td>{u.email or '-'}</td>
-                <td>{u.mobile or '-'}</td>
-                <td>{u.fav_sport or '-'}</td>
-                <td style="font-family: monospace; font-size: 0.85em;">{u.password_hash or '-'}</td>
-                <td>{'✅' if u.is_verified else '❌'}</td>
-            </tr>
+                        <tr>
+                            <td class="fw-bold text-white">#{u.id}</td>
+                            <td>{u.name or '<span class="text-muted">N/A</span>'}</td>
+                            <td>{u.email or '<span class="text-muted">N/A</span>'}</td>
+                            <td>{u.mobile or '<span class="text-muted">N/A</span>'}</td>
+                            <td>{u.fav_sport or '<span class="text-muted">N/A</span>'}</td>
+                            <td class="hash-cell" title="{u.password_hash}">{u.password_hash or '<span class="text-muted">None (OTP only)</span>'}</td>
+                            <td class="text-muted" style="font-size:0.85rem">{date_str}</td>
+                            <td>
+                                <span class="{'badge-verified' if u.is_verified else 'badge-unverified'}">
+                                    {'✓ Verified' if u.is_verified else '✗ Pending'}
+                                </span>
+                            </td>
+                        </tr>
         """
     html += """
-        </table>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Scripts -->
+        <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+        <script>
+            $(document).ready(function() {
+                $('#usersTable').DataTable({
+                    order: [[0, 'desc']],
+                    pageLength: 25,
+                    language: {
+                        search: "Quick Search:",
+                        lengthMenu: "Show _MENU_ users per page",
+                        info: "Showing _START_ to _END_ of _TOTAL_ users"
+                    }
+                });
+            });
+        </script>
     </body>
     </html>
     """
