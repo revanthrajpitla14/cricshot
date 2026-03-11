@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRICSHOT Prediction</title>
+  <meta name="description"
+    content="Identify any cricket batting shot instantly. Upload an image or video and get real-time analysis." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+</head>
+
+<body>
+
+  <!-- ─── Particle Canvas ────────────────────────────────────────── -->
+  <canvas id="particles-canvas"></canvas>
+
+  <!-- ─── Wrong Port Warning Banner ────────────────────────────── -->
+  <div id="wrong-port-banner" style="display:none">
+    ⚠️ &nbsp;Open <strong>http://localhost:5000</strong> instead of port 5500 for full functionality.
+    <button onclick="document.getElementById('wrong-port-banner').remove()">✕</button>
+  </div>
+
+  <!-- ─── Navbar ────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <a class="nav-brand" href="#">
+        <span class="brand-name">CRICSHOT</span>
+      </a>
+      <div class="system-status" title="Backend Inference Server">
+        <span class="status-dot"></span> Model: Online
+      </div>
+    </div>
+
+    <div class="nav-center">
+      <a href="#" class="nav-link">Home / Dashboard</a>
+      <a href="#predict-section" class="nav-link" onclick="document.getElementById('btn-video')?.click()">Upload &amp;
+        Analyze</a>
+      <a href="#stats-section" class="nav-link">Performance Metrics</a>
+    </div>
+
+    <div class="nav-actions">
+      <!-- Notifications Bell -->
+      <div class="notif-bell" title="Alert: Background video processing complete (AWS Lambda)">
+        🔔<span class="notif-badge">1</span>
+      </div>
+
+      <div id="free-counter" class="free-counter"></div>
+      <button class="btn-auth" id="btn-show-auth">Sign In</button>
+      <div class="user-profile" id="user-profile" style="display:none">
+        <span class="secure-session-indicator" title="Encrypted Session (AWS Cognito / Firebase Auth)">🛡️</span>
+        <div class="user-avatar" id="user-avatar">?</div>
+        <span class="user-display-name" id="user-display-name"></span>
+        <button class="btn-logout" id="btn-logout">Log Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── Hero ──────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+      <h1 class="hero-title">
+        Identify Any<br />
+        <span class="gradient-text">Cricket Shot</span><br />
+        Instantly
+      </h1>
+      <p class="hero-subtitle">
+        Upload an image or video — our pose engine analyses body
+        <strong>MediaPipe</strong> &amp; <strong>OpenCV</strong> and classifies
+        the batting shot from <strong>18 shot types</strong> in seconds.
+      </p>
+      <div class="hero-cta">
+        <a href="#predict-section" class="btn-hero-primary">
+          <span>🎯 Analyse a Shot</span>
+        </a>
+        <a href="#shots-section" class="btn-hero-secondary">Shot Library →</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><span class="hs-num">18</span><span class="hs-label">Shot Types</span></div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><span class="hs-num">Robust</span><span class="hs-label">Pose Engine</span></div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><span class="hs-num">3</span><span class="hs-label">Free Tries</span></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ─── Predict Section ───────────────────────────────────────── -->
+  <section id="predict-section" class="predict-section">
+    <div class="section-header">
+      <h2 class="section-title">Analyse Your Shot</h2>
+      <p class="section-subtitle">Upload an image or video clip of a cricket batting shot</p>
+    </div>
+
+    <div class="predict-grid">
+      <!-- Upload Card -->
+      <div class="card upload-card">
+        <div class="card-header">
+          <span class="card-icon">📤</span>
+          <div>
+            <h3 class="card-title">Import Media</h3>
+            <p class="card-subtitle">Drag &amp; drop or click to browse</p>
+          </div>
+        </div>
+
+        <!-- Mode toggle -->
+        <div class="mode-toggle" id="mode-toggle">
+          <button class="mode-btn active" id="btn-image" data-mode="image">🖼 Image</button>
+          <button class="mode-btn" id="btn-video" data-mode="video">🎬 Video</button>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-icon" id="drop-icon">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="8" y="14" width="48" height="36" rx="4" stroke="currentColor" stroke-width="3" />
+              <path d="M22 38 L30 28 L38 35 L45 26" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                stroke-linejoin="round" />
+              <circle cx="22" cy="24" r="3" fill="currentColor" />
+              <path d="M32 52 L32 58 M24 58 L40 58" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+            </svg>
+          </div>
+          <p class="drop-text" id="drop-text">Drop your <strong>cricket image</strong> here</p>
+          <p class="drop-hint" id="drop-hint">JPG · PNG · WEBP supported</p>
+          <button class="btn-browse" id="btn-browse">Choose File</button>
+          <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/*" hidden />
+        </div>
+
+        <!-- Preview -->
+        <div class="preview-container" id="preview-container" style="display:none">
+          <div class="preview-header">
+            <span class="preview-label" id="preview-label">Preview</span>
+            <button class="btn-clear" id="btn-clear" title="Remove">✕</button>
+          </div>
+          <div class="preview-media-wrap">
+            <img id="preview-image" class="preview-media" alt="Preview" style="display:none" />
+            <video id="preview-video" class="preview-media" controls style="display:none"></video>
+          </div>
+          <div class="file-meta" id="file-meta"></div>
+        </div>
+
+
+
+        <!-- Predict Button -->
+        <button class="btn-predict" id="btn-predict" disabled>
+          <span class="btn-text">🎯 Analyse Shot</span>
+          <span class="btn-spinner" id="btn-spinner" style="display:none"></span>
+        </button>
+        <p class="server-note">Powered by <code>MediaPipe</code> + <code>OpenCV</code> · Runs on your local server</p>
+      </div>
+
+      <!-- Result Card -->
+      <div class="card result-card" id="result-card">
+        <!-- Empty State -->
+        <div class="empty-state" id="empty-state">
+          <div class="cricket-anim">
+            <span class="cricket-bat">🏏</span>
+            <span class="cricket-ball">🔴</span>
+          </div>
+          <p class="empty-title">Waiting for your shot…</p>
+          <p class="empty-sub">Upload an image or video then click<br />"Analyse Shot" to get started.</p>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-state" id="loading-state" style="display:none">
+          <div class="ai-loader">
+            <div class="loader-ring"></div>
+            <span class="loader-icon">🤖</span>
+          </div>
+          <p class="loading-title">Analysing…</p>
+          <p class="loading-sub">Running pose estimation &amp; ML inference</p>
+        </div>
+
+        <!-- Result Content (filled by JS) -->
+        <div class="result-content" id="result-content" style="display:none">
+          <!-- Shot Banner -->
+          <div class="shot-banner">
+            <div class="shot-emoji-wrap">
+              <span class="shot-emoji" id="shot-emoji-result">🏏</span>
+            </div>
+            <div class="shot-info">
+              <div class="shot-label">Detected Shot</div>
+              <div class="shot-name" id="shot-name-result">—</div>
+            </div>
+            <div class="conf-badge" id="conf-badge-result">0%</div>
+          </div>
+
+          <!-- Confidence -->
+          <div class="confidence-section">
+            <div class="conf-row">
+              <span class="conf-label">Confidence Score</span>
+              <span class="conf-value" id="conf-value-result">0%</span>
+            </div>
+            <div class="conf-track">
+              <div class="conf-fill" id="conf-fill-result" style="width:0%"></div>
+            </div>
+          </div>
+
+          <!-- Shot description -->
+          <div class="shot-description" id="shot-description-result"></div>
+
+          <!-- Annotated output -->
+          <div class="annotated-section">
+            <div class="section-label">Pose Skeleton Overlay</div>
+            <div class="annotated-wrap">
+              <img id="annotated-image-result" class="annotated-img" alt="Pose skeleton" style="display:none" />
+              <div class="no-skeleton" id="no-skeleton-result" style="display:none">Skeleton unavailable for this frame.
+              </div>
+            </div>
+          </div>
+
+          <!-- Top-5 -->
+          <div class="top5-section">
+            <div class="section-label">Top Predictions</div>
+            <div class="top5-list" id="top5-list-result"></div>
+          </div>
+
+          <!-- Video meta -->
+          <div class="video-meta" id="video-meta-result" style="display:none">
+            <span class="meta-pill" id="frame-count-pill-result">— frames</span>
+            <span class="meta-pill" id="frames-processed-pill-result">— analysed</span>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-state" id="error-state-result" style="display:none">
+          <div class="error-icon">⚠️</div>
+          <p class="error-msg" id="error-msg-result">Something went wrong.</p>
+          <button class="btn-retry" id="btn-retry-result">Try Again</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Stats Section ─────────────────────────────────────────── -->
+  <section id="stats-section" class="stats-section">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-num" id="stat-total-preds">—</div>
+        <div class="stat-label">Total Predictions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-num" id="stat-users">—</div>
+        <div class="stat-label">Registered Users</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-num" id="stat-top-shot">—</div>
+        <div class="stat-label">Most Popular Shot</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🤖</div>
+        <div class="stat-num">18</div>
+        <div class="stat-label">Shot Types Recognised</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Shot Library ──────────────────────────────────────────── -->
+  <section id="shots-section" class="shots-section">
+    <div class="section-header">
+      <h2 class="section-title">18 Recognised Cricket Shots</h2>
+      <p class="section-subtitle">Click any shot to learn technique, tips, and watch tutorials</p>
+    </div>
+    <div class="shots-grid" id="shots-grid"></div>
+  </section>
+
+
+
+  <!-- ─── Shot Detail Modal ─────────────────────────────────────── -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box" id="modal-box" role="dialog" aria-modal="true">
+      <button class="modal-close" id="modal-close" aria-label="Close">&#x2715;</button>
+      <div class="modal-hero">
+        <div class="modal-emoji" id="modal-emoji">&#x1F3CF;</div>
+        <div>
+          <div class="modal-tag" id="modal-tag">Shot Type</div>
+          <h2 class="modal-title" id="modal-title">Shot Name</h2>
+        </div>
+      </div>
+      <div class="modal-facts" id="modal-facts"></div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-tips-wrap" id="modal-tips-wrap">
+        <div class="modal-tips-label">&#x1F4A1; Pro Tips</div>
+        <ul class="modal-tips-list" id="modal-tips"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Auth Modal ────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="auth-modal-overlay">
+    <div class="modal-box auth-modal-box modern-auth" id="auth-modal-box">
+      <button class="modal-close" id="auth-modal-close">&#x2715;</button>
+      <div class="auth-box-inner">
+        <div class="auth-brand-header">
+          <span class="brand-name" style="font-size:1.4rem;font-weight:800">CRICSHOT</span>
+        </div>
+
+        <!-- Login View -->
+        <div class="auth-content active" id="auth-view-login">
+          <h2 class="auth-title">Sign in</h2>
+          <p class="auth-subtitle">Use your CRICSHOT account</p>
+          <form id="form-login" class="modern-form">
+            <div class="input-container" id="group-email">
+              <input type="email" id="login-email" class="floating-input" placeholder=" " required />
+              <label class="floating-label" for="login-email">Email Address</label>
+            </div>
+            <div class="input-container" id="group-password">
+              <input type="password" id="login-password" class="floating-input" placeholder=" " required />
+              <label class="floating-label" for="login-password">Password</label>
+            </div>
+            <div class="auth-actions">
+              <a href="#" id="link-forgot-password" class="auth-text-btn">Forgot password?</a>
+              <button type="submit" class="btn-primary-auth modern-btn">Next →</button>
+            </div>
+          </form>
+          <div class="auth-toggle-text">
+            Don't have an account? <a href="#" id="link-to-signup" class="auth-text-btn">Sign up</a>
+          </div>
+        </div>
+
+        <!-- Sign Up View -->
+        <div class="auth-content" id="auth-view-signup">
+          <h2 class="auth-title">Create Account</h2>
+          <p class="auth-subtitle">Join CRICSHOT for unlimited predictions</p>
+          <form id="form-signup" class="modern-form">
+            <div class="input-container">
+              <input type="email" id="signup-email" class="floating-input" placeholder=" " required />
+              <label class="floating-label" for="signup-email">Email Address</label>
+            </div>
+            <div class="input-container">
+              <input type="password" id="signup-password" class="floating-input" placeholder=" " required />
+              <label class="floating-label" for="signup-password">Password</label>
+            </div>
+            <div class="auth-actions split">
+              <button type="submit" class="btn-primary-auth modern-btn" style="width:100%">Create Account →</button>
+            </div>
+          </form>
+          <div class="auth-toggle-text">
+            Already have an account? <a href="#" id="link-to-login" class="auth-text-btn">Sign in</a>
+          </div>
+        </div>
+
+        <!-- OTP View -->
+        <div class="auth-content" id="auth-view-otp">
+          <h2 class="auth-title">Verify Your Account</h2>
+          <p class="auth-subtitle" id="otp-target-label">Enter the 6-digit code sent to your email</p>
+          <form id="form-otp" class="modern-form">
+            <div class="otp-inputs modern-otp">
+              <input type="text" maxlength="1" class="otp-field" data-index="0" autofocus>
+              <input type="text" maxlength="1" class="otp-field" data-index="1">
+              <input type="text" maxlength="1" class="otp-field" data-index="2">
+              <input type="text" maxlength="1" class="otp-field" data-index="3">
+              <input type="text" maxlength="1" class="otp-field" data-index="4">
+              <input type="text" maxlength="1" class="otp-field" data-index="5">
+            </div>
+            <div class="auth-actions split">
+              <button type="button" class="auth-text-btn" id="btn-resend-otp">Resend code</button>
+              <button type="submit" class="btn-primary-auth modern-btn">Verify ✓</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Forgot Password View -->
+        <div class="auth-content" id="auth-view-forgot">
+          <h2 class="auth-title">Account Recovery</h2>
+          <p class="auth-subtitle">We'll send an OTP to verify it's you</p>
+          <form id="form-forgot" class="modern-form">
+            <div class="input-container">
+              <input type="email" id="forgot-target" class="floating-input" placeholder=" " required />
+              <label class="floating-label" for="forgot-target">Email Address</label>
+            </div>
+            <div class="auth-actions split">
+              <button type="button" class="auth-text-btn" id="link-back-to-login">Cancel</button>
+              <button type="submit" class="btn-primary-auth modern-btn">Send OTP →</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Reset Password View -->
+        <div class="auth-content" id="auth-view-reset">
+          <h2 class="auth-title">Set New Password</h2>
+          <p class="auth-subtitle">OTP verified! Create a strong new password.</p>
+          <form id="form-reset" class="modern-form">
+            <div class="input-container">
+              <input type="password" id="reset-new-password" class="floating-input" placeholder=" " required minlength="6" />
+              <label class="floating-label" for="reset-new-password">New Password</label>
+            </div>
+            <div class="input-container">
+              <input type="password" id="reset-confirm-password" class="floating-input" placeholder=" " required minlength="6" />
+              <label class="floating-label" for="reset-confirm-password">Confirm Password</label>
+            </div>
+            <div class="auth-actions split">
+              <a href="#" class="auth-text-btn" id="link-reset-back-login">Back to Sign in</a>
+              <button type="submit" class="btn-primary-auth modern-btn">Reset Password →</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Error -->
+        <div class="auth-error modern-error" id="auth-error" style="display:none">
+          <span class="error-icon">⚠️</span>
+          <span class="error-text"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+  <script src="webcam.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,33 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Environment / secrets
+.env
+
+# Database (SQLite - ephemeral on Render, don't commit)
+instance/
+*.db
+*.sqlite3
+
+# Training data (too large for GitHub)
+data/
+
+# Temp files
+/tmp/
+*.tmp
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Training script output only (model files ARE committed)
+# model/ is NOT ignored - we need model files in the repo
