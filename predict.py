@@ -14,11 +14,16 @@ import numpy as np
 import cv2
 from PIL import Image
 
-import mediapipe as mp
-from mediapipe.tasks import python as mp_python
-from mediapipe.tasks.python import vision as mp_vision
-from mediapipe.tasks.python.vision import PoseLandmarker, PoseLandmarkerOptions
-from mediapipe.tasks.python.core.base_options import BaseOptions
+try:
+    import mediapipe as mp
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision as mp_vision
+    from mediapipe.tasks.python.vision import PoseLandmarker, PoseLandmarkerOptions
+    from mediapipe.tasks.python.core.base_options import BaseOptions
+    MEDIAPIPE_OK = True
+except Exception as e:
+    print(f"[WARN] MediaPipe import failed: {e}. Predictions disabled.")
+    MEDIAPIPE_OK = False
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 MODEL_DIR       = os.path.join(os.path.dirname(__file__), "model")

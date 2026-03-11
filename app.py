@@ -63,7 +63,7 @@ app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB
 # Security: session cookie settings
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = False  # Set True in production with HTTPS
+app.config["SESSION_COOKIE_SECURE"] = bool(os.getenv("RENDER"))  # True on Render (HTTPS), False locally
 
 # Mail Configuration
 app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
@@ -432,6 +432,16 @@ def send_otp(user, otp):
         except Exception:
             pass
     return True
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  HEALTH CHECK
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.route("/health")
+def health():
+    """Render health check — returns 200 JSON when server is ready."""
+    return jsonify({"status": "ok", "server": "cricshot"}), 200
 
 
 # ═══════════════════════════════════════════════════════════════════════

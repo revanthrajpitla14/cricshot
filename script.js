@@ -758,8 +758,10 @@ btnPredict.addEventListener("click", async () => {
       }
     }
   } catch (err) {
-    if (err.name === "TypeError") {
-      showError("Cannot connect to server. Is Python (app.py) running at localhost:5000?");
+    if (err.message && err.message.includes('<!doctype')) {
+      showError("Server is starting up — please wait 30 seconds and try again.");
+    } else if (err.name === "TypeError") {
+      showError("Cannot connect to server. Please try again shortly.");
     } else {
       showError(`Unexpected error: ${err.message}`);
     }
@@ -774,6 +776,53 @@ checkAuthStatus();
 loadStats();
 // loadMetrics(); // Function not defined, causes ReferenceError
 
+// ─── Server Warm-up Check (for Render cold starts) ──────────────────────────
+(function checkServerReady() {
+  const banner = document.createElement("div");
+  banner.id = "server-warming-banner";
+  banner.style.cssText = `
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:#1a2a3a;border:1px solid #00e88a;color:#00e88a;
+    padding:12px 24px;border-radius:8px;font-size:14px;z-index:9999;
+    display:none;text-align:center;box-shadow:0 4px 20px rgba(0,232,138,0.2);
+  `;
+  banner.innerHTML = "⏳ Server is waking up (free tier cold start)... please wait";
+  document.body.appendChild(banner);
+
+  let attempts = 0;
+  const maxAttempts = 20; // 60 seconds total
+
+  function ping() {
+    fetch("/health")
+      .then(r => r.json())
+      .then(d => {
+        if (d.status === "ok") {
+          banner.style.display = "none";
+        } else {
+          retry();
+        }
+      })
+      .catch(() => retry());
+  }
+
+  function retry() {
+    attempts++;
+    if (attempts >= maxAttempts) {
+      banner.innerHTML = "⚠️ Server may be down. Please refresh the page.";
+      banner.style.borderColor = "#ff4444";
+      banner.style.color = "#ff4444";
+      banner.style.display = "flex";
+      return;
+    }
+    banner.style.display = "flex";
+    setTimeout(ping, 3000);
+  }
+
+  // Start polling after 2 seconds (give server a chance to be ready)
+  setTimeout(ping, 2000);
+})();
+
+
 // ─── Load Stats from /stats endpoint ───────────────────────────────────
 function loadStats() {
   fetch(`${API_BASE}/stats`, { credentials: 'include' })
@@ -784,7 +833,7 @@ function loadStats() {
       el("stat-users", d.registered_users ?? 0);
       el("stat-top-shot", d.top_shots?.[0]?.shot ?? "N/A");
     })
-    .catch(() => { }); // silently ignore if server not ready
+    .catch(() => { }); // silently ignore if server not ready yet
 }
 
 // ─── Authentication Logic ───────────────────────────────────────────
