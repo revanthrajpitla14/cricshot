@@ -511,7 +511,7 @@ def signup():
     log_activity(user.id, "otp_sent", detail=f"channel={'email' if email else 'sms'}")
     send_otp(user, otp)
 
-    return jsonify({"message": "OTP sent", "user_id": user.id : otp})
+    return jsonify({"message": "OTP sent", "user_id": user.id})
 
 
 @app.route("/auth/login", methods=["POST"])
