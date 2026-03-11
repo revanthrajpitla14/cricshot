@@ -860,6 +860,82 @@ def api_predict_frame():
 
 
 # ═══════════════════════════════════════════════════════════════════════
+#  ADMIN & DATABASE UTILS
+# ═══════════════════════════════════════════════════════════════════════
+
+@app.route("/admin/users")
+def admin_users():
+    """Simple admin view to see all registered users and their details."""
+    users = User.query.order_by(User.id.desc()).all()
+    html = """
+    <html>
+    <head>
+        <title>Admin - User Details</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b1a35; color: #fff; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; background: rgba(255,255,255,0.05); }
+            th, td { border: 1px solid rgba(0, 232, 138, 0.3); padding: 12px; text-align: left; }
+            th { background: rgba(0, 232, 138, 0.1); color: #00e88a; }
+            .btn-reset { background: #ff4d6d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+            .btn-reset:hover { background: #ff2a50; }
+            a { color: #00e88a; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+        </style>
+    </head>
+    <body>
+        <h2>🛡️ CRICSHOT Admin Panel</h2>
+        <p><a href="/">&larr; Back to App</a></p>
+        
+        <form method="POST" action="/admin/database/reset" onsubmit="return confirm('WARNING: This will delete ALL users and predictions. Are you strictly sure you want to refresh the database?');">
+            <button type="submit" class="btn-reset">⚠️ Refresh / Wipe Database</button>
+        </form>
+
+        <h3>Registered Users</h3>
+        <table>
+            <tr>
+                <th>ID</th><th>Name</th><th>Email</th><th>Mobile</th><th>Fav Sport</th><th>Password Hash</th><th>Verified</th>
+            </tr>
+    """
+    for u in users:
+        html += f"""
+            <tr>
+                <td>{u.id}</td>
+                <td>{u.name or '-'}</td>
+                <td>{u.email or '-'}</td>
+                <td>{u.mobile or '-'}</td>
+                <td>{u.fav_sport or '-'}</td>
+                <td style="font-family: monospace; font-size: 0.85em;">{u.password_hash or '-'}</td>
+                <td>{'✅' if u.is_verified else '❌'}</td>
+            </tr>
+        """
+    html += """
+        </table>
+    </body>
+    </html>
+    """
+    return html
+
+@app.route("/admin/database/reset", methods=["POST"])
+def reset_database():
+    """Drop and recreate all database tables to provide a fresh start."""
+    try:
+        db.drop_all()
+        db.create_all()
+        return """
+        <body style="background:#0b1a35; color:#00e88a; font-family:sans-serif; text-align:center; padding:50px;">
+            <h2>✅ Database has been completely refreshed!</h2>
+            <p>All tables were dropped and recreated successfully.</p>
+            <br>
+            <a href="/admin/users" style="color:#fff;">Go back to Admin Panel</a>
+        </body>
+        """
+    except Exception as e:
+        return f"Error refreshing database: {e}", 500
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════
 #  PILLAR 3: PERFORMANCE METRICS
 # ═══════════════════════════════════════════════════════════════════════
 
