@@ -689,56 +689,62 @@ def _log_prediction(result: dict, file_type: str, session_token: str = None):
 
 @app.route("/predict/image", methods=["POST"])
 def api_predict_image():
-    allowed, err = _check_anon_quota()
-    if not allowed:
-        return err
-
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided."}), 400
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "Empty filename."}), 400
-    if not _allowed(file.filename, ALLOWED_IMAGE_EXT):
-        return jsonify({"error": "Unsupported image format."}), 400
-
-    result = predict_image(file.read())
-
     try:
-        token, _ = get_or_create_anon_session()
-        _log_prediction(result, "image", session_token=token)
-        resp = jsonify(result)
-        resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
-        return resp, 200
-    except Exception:
-        db.session.rollback()
-        return jsonify(result), 200  # return prediction even if DB logging fails
+        allowed, err = _check_anon_quota()
+        if not allowed:
+            return err
+
+        if "file" not in request.files:
+            return jsonify({"error": "No file provided."}), 400
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "Empty filename."}), 400
+        if not _allowed(file.filename, ALLOWED_IMAGE_EXT):
+            return jsonify({"error": "Unsupported image format."}), 400
+
+        result = predict_image(file.read())
+
+        try:
+            token, _ = get_or_create_anon_session()
+            _log_prediction(result, "image", session_token=token)
+            resp = jsonify(result)
+            resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
+            return resp, 200
+        except Exception:
+            db.session.rollback()
+            return jsonify(result), 200  # return prediction even if DB logging fails
+    except Exception as e:
+        return jsonify({"error": f"Server crash during prediction: {str(e)}"}), 500
 
 
 @app.route("/predict/video", methods=["POST"])
 def api_predict_video():
-    allowed, err = _check_anon_quota()
-    if not allowed:
-        return err
-
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided."}), 400
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "Empty filename."}), 400
-    if not _allowed(file.filename, ALLOWED_VIDEO_EXT):
-        return jsonify({"error": "Unsupported video format."}), 400
-
-    result = predict_video(file.read())
-
     try:
-        token, _ = get_or_create_anon_session()
-        _log_prediction(result, "video", session_token=token)
-        resp = jsonify(result)
-        resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
-        return resp, 200
-    except Exception:
-        db.session.rollback()
-        return jsonify(result), 200
+        allowed, err = _check_anon_quota()
+        if not allowed:
+            return err
+
+        if "file" not in request.files:
+            return jsonify({"error": "No file provided."}), 400
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "Empty filename."}), 400
+        if not _allowed(file.filename, ALLOWED_VIDEO_EXT):
+            return jsonify({"error": "Unsupported video format."}), 400
+
+        result = predict_video(file.read())
+
+        try:
+            token, _ = get_or_create_anon_session()
+            _log_prediction(result, "video", session_token=token)
+            resp = jsonify(result)
+            resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
+            return resp, 200
+        except Exception:
+            db.session.rollback()
+            return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": f"Server crash during prediction: {str(e)}"}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════════
