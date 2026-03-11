@@ -130,8 +130,10 @@ class User(db.Model, UserMixin):
     __tablename__ = "users"
 
     id            = db.Column(db.Integer,     primary_key=True)
+    name          = db.Column(db.String(100), nullable=True)
     email         = db.Column(db.String(120), unique=True, nullable=True, index=True)
     mobile        = db.Column(db.String(20),  unique=True, nullable=True, index=True)
+    fav_sport     = db.Column(db.String(100), nullable=True)
     password_hash = db.Column(db.String(128), nullable=True)
     is_verified   = db.Column(db.Boolean,     default=False)
     otp_code      = db.Column(db.String(6),   nullable=True)
@@ -463,6 +465,7 @@ def auth_status():
         return jsonify({
             "is_logged_in": True,
             "user": {
+                "name":       current_user.name,
                 "email":      current_user.email,
                 "mobile":     current_user.mobile,
                 "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
@@ -483,20 +486,27 @@ def auth_status():
 @app.route("/auth/signup", methods=["POST"])
 def signup():
     data     = request.json
+    name     = data.get("name")
     email    = data.get("email")
     mobile   = data.get("mobile")
+    fav_sport= data.get("fav_sport")
     password = data.get("password")
 
     if not email and not mobile:
         return jsonify({"error": "Email or Mobile required"}), 400
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+
     if email and User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already registered"}), 400
     if mobile and User.query.filter_by(mobile=mobile).first():
         return jsonify({"error": "Mobile already registered"}), 400
 
     user = User(
+        name=name,
         email=email,
         mobile=mobile,
+        fav_sport=fav_sport,
         password_hash=bcrypt.generate_password_hash(password).decode("utf-8") if password else None,
         is_verified=False
     )

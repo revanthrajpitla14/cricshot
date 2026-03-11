@@ -957,7 +957,10 @@ formLogin.addEventListener("submit", async e => {
 formSignup.addEventListener("submit", async e => {
   e.preventDefault();
   const payload = {
+    name: document.getElementById("signup-name").value,
+    mobile: document.getElementById("signup-mobile").value || null,
     email: document.getElementById("signup-email").value,
+    fav_sport: document.getElementById("signup-sport").value || null,
     password: document.getElementById("signup-password").value
   };
 
