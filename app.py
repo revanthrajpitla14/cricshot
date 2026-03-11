@@ -31,7 +31,16 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
-from predict import predict_image, predict_video, predict_frame
+try:
+    from predict import predict_image, predict_video, predict_frame
+    PREDICT_OK = True
+except Exception as _predict_import_err:
+    print(f"[WARN] predict.py failed to import: {_predict_import_err}")
+    PREDICT_OK = False
+    def predict_image(b): return {"error": "Prediction module unavailable on this server."}
+    def predict_video(b): return {"error": "Prediction module unavailable on this server."}
+    def predict_frame(b): return {"error": "Prediction module unavailable on this server."}
+
 import json
 
 # Try to import Flask-Limiter for rate limiting

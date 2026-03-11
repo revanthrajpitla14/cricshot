@@ -758,7 +758,8 @@ btnPredict.addEventListener("click", async () => {
       }
     }
   } catch (err) {
-    if (err.message && err.message.includes('<!doctype')) {
+    const eMsg = (err.message || "").toLowerCase();
+    if (eMsg.includes('<!doctype') || eMsg.includes('not valid json') || eMsg.includes('unexpected token')) {
       showError("Server is starting up — please wait 30 seconds and try again.");
     } else if (err.name === "TypeError") {
       showError("Cannot connect to server. Please try again shortly.");
