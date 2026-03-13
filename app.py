@@ -58,11 +58,28 @@ BASE_DIR = os.path.dirname(__file__)
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "cricshot-secret-key-12345")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-    "DATABASE_URL",
-    # On Render the app dir is read-only; use /tmp for SQLite
-    "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
-)
+
+# Detect Turso DB configuration
+turso_url = os.getenv("TURSO_DATABASE_URL")
+if turso_url:
+    # Check if the dialect is successfully installed
+    try:
+        from sqlalchemy.dialects import registry
+        registry.load("sqlite.libsql")
+        # SQLAlchemy dialect for Turso is sqlite+libsql://
+        db_uri = turso_url.replace("libsql://", "sqlite+libsql://")
+        if os.getenv("TURSO_AUTH_TOKEN"):
+            db_uri += f"/?authToken={os.getenv('TURSO_AUTH_TOKEN')}&secure=true"
+    except Exception:
+        print("⚠️  sqlalchemy-libsql not found on Windows. Falling back to local SQLite.")
+        db_uri = "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
+else:
+    # Fallback SQLite
+    db_uri = "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", db_uri)
+
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "connect_args": {"timeout": 30},       # wait up to 30s for lock
