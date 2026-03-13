@@ -867,6 +867,11 @@ def api_predict_frame():
 def admin_users():
     """Professional admin view to see all registered users and their details."""
     users = User.query.order_by(User.id.desc()).all()
+    activities = ActivityLog.query.order_by(ActivityLog.id.desc()).all()
+    sessions = AnonymousSession.query.order_by(AnonymousSession.last_used.desc()).all()
+    predictions = Prediction.query.order_by(Prediction.id.desc()).all()
+
+
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -895,7 +900,7 @@ def admin_users():
                 min-height: 100vh;
             }
             .admin-container {
-                max-width: 1300px;
+                max-width: 1400px;
                 margin: 40px auto;
                 padding: 30px;
                 background: var(--theme-card);
@@ -946,6 +951,12 @@ def admin_users():
                 color: var(--theme-accent);
             }
             
+            /* Tabs */
+            .nav-tabs { border-bottom-color: var(--theme-border); margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+            .nav-tabs .nav-link { color: rgba(255,255,255,0.7); font-weight: 600; border: none; border-bottom: 3px solid transparent; border-radius: 0; padding: 12px 20px; }
+            .nav-tabs .nav-link:hover { color: var(--theme-accent); border-color: transparent; border-bottom-color: rgba(0, 232, 138, 0.5); }
+            .nav-tabs .nav-link.active { color: var(--theme-accent); background: transparent; border-color: transparent; border-bottom-color: var(--theme-accent); }
+
             /* DataTables Dark Theme Overrides */
             .table { color: var(--theme-text) !important; border-color: rgba(255,255,255,0.1) !important; }
             .table-striped>tbody>tr:nth-of-type(odd)>* { color: var(--theme-text); background-color: rgba(255,255,255,0.02); }
@@ -960,7 +971,7 @@ def admin_users():
             .dataTables_wrapper .dataTables_filter input:focus { outline: none; border-color: var(--theme-accent); }
             .page-item.active .page-link { background-color: var(--theme-accent); border-color: var(--theme-accent); color: #000; font-weight: 600;}
             .page-link { background-color: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1); color: var(--theme-text); }
-            .page-link:hover { background-color: rgba(255,255,255,0.1); }
+            .page-link:hover { background-color: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white; }
             
             .badge-verified { background: rgba(0, 232, 138, 0.2); color: #00e88a; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
             .badge-unverified { background: rgba(255, 77, 109, 0.2); color: #ff4d6d; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
@@ -976,73 +987,214 @@ def admin_users():
                 </div>
                 <form method="POST" action="/admin/database/reset" onsubmit="return confirm('CRITICAL WARNING:\\n\\nThis will completely WIPE the SQLite database.\\nALL users and historical data will be lost.\\n\\nAre you absolutely sure you want to proceed?');">
                     <button type="submit" class="btn-reset">
-                        <svg xmlns="http://www.w3.org/Form" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
-                        Factory Reset Database
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
+                        Factory Reset <span style="margin-left:5px" class="d-none d-sm-inline">Database</span>
                     </button>
                 </form>
             </div>
 
-            <div class="table-responsive">
-                <table id="usersTable" class="table table-striped w-100">
-                    <thead>
-                        <tr>
-                            <th>User ID</th>
-                            <th>Full Name</th>
-                            <th>Email Address</th>
-                            <th>Mobile No.</th>
-                            <th>Favourite Sport</th>
-                            <th>Password Hash</th>
-                            <th>Registered</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <!-- Tabs Navigation -->
+            <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">Registered Users</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="activities-tab" data-bs-toggle="tab" data-bs-target="#activities" type="button" role="tab">Activity Logs</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions" type="button" role="tab">Anonymous Sessions</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="predictions-tab" data-bs-toggle="tab" data-bs-target="#predictions" type="button" role="tab">Predictions</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="adminTabsContent">
+                <!-- Users Tab -->
+                <div class="tab-pane fade show active" id="users" role="tabpanel">
+                    <div class="table-responsive">
+                        <table id="usersTable" class="table table-striped w-100">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Full Name</th>
+                                    <th>Email Address</th>
+                                    <th>Mobile No.</th>
+                                    <th>Sport</th>
+                                    <th>Password Hash</th>
+                                    <th>Registered</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
     """
     for u in users:
-        date_str = u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "Unknown"
+        date_str = u.created_at.strftime("%Y-%m-%d %H:%M:%S") if u.created_at else "Unknown"
         html += f"""
-                        <tr>
-                            <td class="fw-bold text-white">#{u.id}</td>
-                            <td>{u.name or '<span class="text-muted">N/A</span>'}</td>
-                            <td>{u.email or '<span class="text-muted">N/A</span>'}</td>
-                            <td>{u.mobile or '<span class="text-muted">N/A</span>'}</td>
-                            <td>{u.fav_sport or '<span class="text-muted">N/A</span>'}</td>
-                            <td class="hash-cell" title="{u.password_hash}">{u.password_hash or '<span class="text-muted">None (OTP only)</span>'}</td>
-                            <td class="text-muted" style="font-size:0.85rem">{date_str}</td>
-                            <td>
-                                <span class="{'badge-verified' if u.is_verified else 'badge-unverified'}">
-                                    {'✓ Verified' if u.is_verified else '✗ Pending'}
-                                </span>
-                            </td>
-                        </tr>
+                                <tr>
+                                    <td class="fw-bold text-white">#{u.id}</td>
+                                    <td>{u.name or '<span class="text-muted">N/A</span>'}</td>
+                                    <td>{u.email or '<span class="text-muted">N/A</span>'}</td>
+                                    <td>{u.mobile or '<span class="text-muted">N/A</span>'}</td>
+                                    <td>{u.fav_sport or '<span class="text-muted">N/A</span>'}</td>
+                                    <td class="hash-cell" title="{u.password_hash}">{u.password_hash or '<span class="text-muted">None (OTP only)</span>'}</td>
+                                    <td class="text-muted" style="font-size:0.85rem">{date_str}</td>
+                                    <td>
+                                        <span class="{'badge-verified' if u.is_verified else 'badge-unverified'}">
+                                            {'✓ Verified' if u.is_verified else '✗ Pending'}
+                                        </span>
+                                    </td>
+                                </tr>
         """
+
     html += """
-                    </tbody>
-                </table>
-            </div>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Activity Logs Tab -->
+                <div class="tab-pane fade" id="activities" role="tabpanel">
+                    <div class="table-responsive pt-2">
+                        <table id="activitiesTable" class="table table-striped w-100">
+                            <thead>
+                                <tr>
+                                    <th>Log ID</th>
+                                    <th>Date/Time</th>
+                                    <th>User ID</th>
+                                    <th>Event Name</th>
+                                    <th>Event Details</th>
+                                    <th>Client IP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+    for log in activities:
+        date_str = log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "Unknown"
+        html += f"""
+                                <tr>
+                                    <td class="fw-bold text-white">#{log.id}</td>
+                                    <td class="text-muted" style="font-size:0.85rem">{date_str}</td>
+                                    <td>{f'User #{log.user_id}' if log.user_id else '<span class="text-muted">N/A</span>'}</td>
+                                    <td><span class="badge bg-secondary">{log.event}</span></td>
+                                    <td>{log.detail or '<span class="text-muted">-</span>'}</td>
+                                    <td>{log.ip_address or '<span class="text-muted">Unknown</span>'}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Anonymous Sessions Tab -->
+                <div class="tab-pane fade" id="sessions" role="tabpanel">
+                    <div class="table-responsive pt-2">
+                        <table id="sessionsTable" class="table table-striped w-100">
+                            <thead>
+                                <tr>
+                                    <th>Session ID</th>
+                                    <th>Token / Cookie</th>
+                                    <th>Preds. Used</th>
+                                    <th>Action</th>
+                                    <th>Last Used</th>
+                                    <th>Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+    for sess in sessions:
+        created_str = sess.created_at.strftime("%Y-%m-%d %H:%M:%S") if sess.created_at else "Unknown"
+        used_str = sess.last_used.strftime("%Y-%m-%d %H:%M:%S") if sess.last_used else "Unknown"
+        html += f"""
+                                <tr>
+                                    <td class="fw-bold text-white">#{sess.id}</td>
+                                    <td class="hash-cell" title="{sess.session_token}">{sess.session_token}</td>
+                                    <td>{sess.prediction_count}</td>
+                                    <td><span class="badge bg-info text-dark">Limit: {FREE_PREDICTION_LIMIT}</span></td>
+                                    <td class="text-muted" style="font-size:0.85rem">{used_str}</td>
+                                    <td class="text-muted" style="font-size:0.85rem">{created_str}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Predictions Tab -->
+                <div class="tab-pane fade" id="predictions" role="tabpanel">
+                    <div class="table-responsive pt-2">
+                        <table id="predictionsTable" class="table table-striped w-100">
+                            <thead>
+                                <tr>
+                                    <th>Pred ID</th>
+                                    <th>Predict Date/Time</th>
+                                    <th>Caller Info</th>
+                                    <th>AI Shot Detection</th>
+                                    <th>Confidence</th>
+                                    <th>Format</th>
+                                    <th>Client IP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+    for pred in predictions:
+        date_str = pred.created_at.strftime("%Y-%m-%d %H:%M:%S") if pred.created_at else "Unknown"
+        user_info = f"<span class='badge bg-success'>User #{pred.user_id}</span>" if pred.user_id else (f"<span class='badge bg-secondary'>Anon</span> <span class='hash-cell' title='{pred.session_token}'>{str(pred.session_token)[:8]}...</span>" if pred.session_token else "<span class='text-muted'>Unknown</span>")
+        html += f"""
+                                <tr>
+                                    <td class="fw-bold text-white">#{pred.id}</td>
+                                    <td class="text-muted" style="font-size:0.85rem">{date_str}</td>
+                                    <td>{user_info}</td>
+                                    <td style="color:var(--theme-accent); font-weight:600;">{pred.shot_name}</td>
+                                    <td>{round(pred.confidence * 100, 1) if pred.confidence is not None else 0.0}%</td>
+                                    <td><span class="badge bg-dark border border-secondary">{str(pred.file_type).upper()}</span></td>
+                                    <td>{pred.ip_address or '<span class="text-muted">Unknown</span>'}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div> <!-- End Tab Content -->
         </div>
 
         <!-- Scripts -->
         <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+        <!-- Bootstrap Bundle with Popper (required for tabs) -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
         <script>
             $(document).ready(function() {
-                $('#usersTable').DataTable({
+                var tableOptions = {
                     order: [[0, 'desc']],
                     pageLength: 25,
                     language: {
-                        search: "Quick Search:",
-                        lengthMenu: "Show _MENU_ users per page",
-                        info: "Showing _START_ to _END_ of _TOTAL_ users"
+                        search: "Search:",
+                        lengthMenu: "Show _MENU_ rows",
+                        info: "Showing _START_ to _END_ of _TOTAL_ entries"
                     }
-                });
+                };
+
+                // Initialize all tables
+                $('#usersTable').DataTable(tableOptions);
+                $('#activitiesTable').DataTable(tableOptions);
+                $('#sessionsTable').DataTable(tableOptions);
+                $('#predictionsTable').DataTable(tableOptions);
             });
         </script>
     </body>
     </html>
     """
     return html
+
 
 @app.route("/admin/database/reset", methods=["POST"])
 def reset_database():
