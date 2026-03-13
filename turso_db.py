@@ -49,15 +49,15 @@ def sync_local_db_to_turso(local_db_path="instance/cricshot.db"):
     token = os.getenv("TURSO_AUTH_TOKEN")
     
     if not url or not token:
-        print("[TURSO] ❌ Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN in .env.")
+        print("[TURSO] Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN in .env.")
         return False
         
-    print(f"[TURSO] 📦 Syncing local {local_db_path} to Turso...")
+    print(f"[TURSO] Syncing local {local_db_path} to Turso...")
     turso = TursoEngine(url, token)
     
     # Connect local SQLite
     if not os.path.exists(local_db_path):
-        print(f"[TURSO] ❌ Local DB '{local_db_path}' not found.")
+        print(f"[TURSO] Local DB '{local_db_path}' not found.")
         return False
         
     con = sqlite3.connect(local_db_path)
@@ -67,7 +67,7 @@ def sync_local_db_to_turso(local_db_path="instance/cricshot.db"):
     cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
     schemas = [row[0] for row in cur.fetchall() if row[0]]
     
-    print(f"[TURSO] 🏗️ Creating {len(schemas)} tables on remote...")
+    print(f"[TURSO] Creating {len(schemas)} tables on remote...")
     turso.execute_batch(schemas)
     
     # 2. Grab all rows
@@ -102,11 +102,11 @@ def sync_local_db_to_turso(local_db_path="instance/cricshot.db"):
             q = f"INSERT OR REPLACE INTO {table} ({','.join(cols)}) VALUES ({','.join(vals)});"
             queries.append(q)
             
-        print(f"[TURSO] 📤 Pushing {len(queries)} rows to {table}...")
+        print(f"[TURSO] Pushing {len(queries)} rows to {table}...")
         turso.execute_batch(queries)
         total_inserts += len(queries)
         
-    print(f"[TURSO] ✅ Successfully synced {total_inserts} rows across {len(tables)} tables to Turso.")
+    print(f"[TURSO] Successfully synced {total_inserts} rows across {len(tables)} tables to Turso.")
     return True
 
 if __name__ == "__main__":

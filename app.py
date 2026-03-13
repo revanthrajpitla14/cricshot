@@ -27,6 +27,7 @@ if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
 from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text # Added for raw SQL health checks
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
@@ -61,23 +62,31 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "cricshot-secret-key-12345")
 
 # Detect Turso DB configuration
 turso_url = os.getenv("TURSO_DATABASE_URL")
+turso_auth_token = os.getenv("TURSO_AUTH_TOKEN")
+db_uri = None
+
 if turso_url:
-    # Check if the dialect is successfully installed
+    # Use HTTPS for better compatibility across platforms (Windows/Linux)
+    base_url = turso_url.replace("libsql://", "https://")
+    
+    # Check for sqlalchemy-libsql dialect
     try:
         from sqlalchemy.dialects import registry
         registry.load("sqlite.libsql")
-        # SQLAlchemy dialect for Turso is sqlite+libsql://
+        # Registry load succeeded: use sqlite+libsql://
         db_uri = turso_url.replace("libsql://", "sqlite+libsql://")
-        if os.getenv("TURSO_AUTH_TOKEN"):
-            db_uri += f"/?authToken={os.getenv('TURSO_AUTH_TOKEN')}&secure=true"
+        if turso_auth_token:
+            db_uri += f"/?authToken={turso_auth_token}&secure=true"
+        print(f"✅ Turso DB detected: Using sqlalchemy-libsql dialect.")
     except Exception:
-        print("⚠️  sqlalchemy-libsql not found on Windows. Falling back to local SQLite.")
-        db_uri = "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
-else:
-    # Fallback SQLite
-    db_uri = "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
+        # Fallback for Windows or missing driver
+        print("⚠️  sqlalchemy-libsql not found or incompatible. Falling back to local/temp SQLite.")
+        db_uri = None # Let the final assignment handle it correctly
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", db_uri)
+# Final URI assignment fallback
+default_local_db = "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", db_uri or default_local_db)
+print(f"DEBUG: SQLALCHEMY_DATABASE_URI = {app.config['SQLALCHEMY_DATABASE_URI']}")
 
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -469,7 +478,19 @@ def send_otp(user, otp):
 @app.route("/health")
 def health():
     """Render health check — returns 200 JSON when server is ready."""
-    return jsonify({"status": "ok", "server": "cricshot"}), 200
+    db_connected = False
+    try:
+        db.session.execute(text("SELECT 1"))
+        db_connected = True
+    except Exception:
+        pass
+    
+    return jsonify({
+        "status": "ok", 
+        "server": "cricshot",
+        "database": "connected" if db_connected else "disconnected",
+        "using_turso": os.getenv("TURSO_DATABASE_URL") is not None
+    }), 200
 
 
 # ═══════════════════════════════════════════════════════════════════════

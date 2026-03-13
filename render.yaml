@@ -31,3 +31,7 @@ services:
         sync: false
       - key: TWI_PHONE_NUMBER
         sync: false
+      - key: TURSO_DATABASE_URL
+        value: libsql://cricshotdb-revanth14.aws-ap-south-1.turso.io
+      - key: TURSO_AUTH_TOKEN
+        sync: false

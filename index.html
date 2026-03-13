@@ -33,7 +33,10 @@
         <span class="brand-name">CRICSHOT</span>
       </a>
       <div class="system-status" title="Backend Inference Server">
-        <span class="status-dot"></span> Model: Online
+        <span class="status-dot"></span> Model: <span id="model-status">Online</span>
+      </div>
+      <div class="system-status" id="db-status-container" title="Turso libSQL Cloud Database">
+        <span class="status-dot" id="db-status-dot"></span> DB: <span id="db-status-text">Connecting...</span>
       </div>
     </div>
 

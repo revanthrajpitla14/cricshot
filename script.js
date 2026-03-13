@@ -796,8 +796,30 @@ btnPredict.addEventListener("click", async () => {
 });
 
 // ─── Initial State ──────────────────────────────────────────────────────────
+async function checkSystemHealth() {
+  const dbText = document.getElementById("db-status-text");
+  const dbDot  = document.getElementById("db-status-dot");
+  
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    const data = await res.json();
+    
+    if (data.database === "connected") {
+      dbText.textContent = data.using_turso ? "Turso Live" : "Local SQLite";
+      dbDot.className = "status-dot" + (data.using_turso ? "" : " local");
+    } else {
+      dbText.textContent = "Offline";
+      dbDot.className = "status-dot offline";
+    }
+  } catch (err) {
+    dbText.textContent = "Error";
+    dbDot.className = "status-dot offline";
+  }
+}
+
 showEmptyState();
 checkAuthStatus();
+checkSystemHealth();
 loadStats();
 // loadMetrics(); // Function not defined, causes ReferenceError
 

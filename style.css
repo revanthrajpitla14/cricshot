@@ -87,6 +87,13 @@ a { text-decoration: none; color: inherit; }
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--neon); box-shadow: 0 0 10px var(--neon);
   animation: dot-pulse 2s infinite ease-in-out;
+  transition: all 0.3s ease;
+}
+.status-dot.local {
+  background: var(--neon2); box-shadow: 0 0 10px var(--neon2);
+}
+.status-dot.offline {
+  background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red);
 }
 @keyframes pulse-opacity { from { opacity: 0.4; } to { opacity: 1; } }
 
