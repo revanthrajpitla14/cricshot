@@ -1,18 +1,16 @@
-import os
 from dotenv import load_dotenv
-import libsql_client
-
 load_dotenv()
+from turso_db import make_turso_connection
+import os
 
-url = os.getenv("TURSO_DATABASE_URL", "").replace("libsql://", "https://")
-token = os.getenv("TURSO_AUTH_TOKEN")
+conn = make_turso_connection(os.getenv('TURSO_DATABASE_URL'), os.getenv('TURSO_AUTH_TOKEN'))
+cur = conn.cursor()
+cur.execute('SELECT 1')
+print('Basic connection:', cur.fetchone())
 
-print(f"Connecting to: {url}")
-
-try:
-    client = libsql_client.create_client_sync(url=url, auth_token=token)
-    result = client.execute("SELECT 1")
-    print("SUCCESS: Connection established!")
-    print(result)
-except Exception as e:
-    print(f"FAILED: {e}")
+cur.execute("CREATE TABLE IF NOT EXISTS _healthcheck (id INTEGER PRIMARY KEY)")
+cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+tables = [r[0] for r in cur.fetchall()]
+print('Tables in DB:', tables)
+conn.close()
+print('SUCCESS - Turso DB is live and ready!')
