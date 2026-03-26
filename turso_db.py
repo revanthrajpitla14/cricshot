@@ -47,7 +47,7 @@ class TursoHttpClient:
                 {"type": "close"}
             ]
         }
-        
+
         try:
             resp = self.session.post(
                 f"{self.url}/v2/pipeline",
@@ -55,23 +55,42 @@ class TursoHttpClient:
                 headers=self.headers,
                 timeout=30
             )
-            # libsql pipeline returns array of results mapping to requests array
+
+            if resp.status_code == 401:
+                raise Exception("Turso: Unauthorized — check TURSO_AUTH_TOKEN")
+            if resp.status_code not in (200, 201):
+                raise Exception(f"Turso HTTP {resp.status_code}: {resp.text[:500]}")
+
             data = resp.json()
-            if "results" in data and len(data["results"]) > 0:
-                result_obj = data["results"][0]
-                if "response" in result_obj and "result" in result_obj["response"]:
-                    # Return the raw result dict
-                    return result_obj["response"]["result"]
-                elif "error" in result_obj:
-                    raise Exception(f"Turso SQL Error: {result_obj['error']['message']}")
-            
-            # Fallback for unexpected response shape
-            if "message" in data:
-               raise Exception(f"Turso HTTP Error: {data['message']}")
+
+            # top-level error (e.g. bad request format)
+            if "error" in data and "results" not in data:
+                raise Exception(f"Turso top-level error: {data['error']}")
+
+            results = data.get("results", [])
+            if not results:
+                return {}  # DDL with no result set
+
+            result_obj = results[0]
+
+            # Pipeline-level error ─ type = "error"
+            if result_obj.get("type") == "error":
+                err = result_obj.get("error", {})
+                raise Exception(
+                    f"Turso SQL error [{err.get('code', '?')}]: {err.get('message', str(err))}"
+                    f"\n  SQL: {sql[:300]}"
+                )
+
+            response = result_obj.get("response", {})
+            if "result" in response:
+                return response["result"]
+
+            # close/non-execute response — DDL succeeded with no rows
             return {}
-            
+
         except requests.exceptions.RequestException as e:
-            raise Exception(f"Turso Network Error: {e}")
+            raise Exception(f"Turso network error: {e}")
+
 
     def close(self):
         self.session.close()
@@ -124,7 +143,10 @@ class TursoCursor:
         formatted_args = []
         if params:
             for p in params:
-                if p is None:
+                # bool MUST come before int — bool is a subclass of int in Python
+                if isinstance(p, bool):
+                    formatted_args.append({"type": "integer", "value": "1" if p else "0"})
+                elif p is None:
                     formatted_args.append({"type": "null"})
                 elif isinstance(p, int):
                     formatted_args.append({"type": "integer", "value": str(p)})
@@ -134,11 +156,10 @@ class TursoCursor:
                     formatted_args.append({"type": "text", "value": p})
                 elif isinstance(p, bytes):
                     import base64
-                    formatted_args.append({"type": "blob", "value": base64.b64encode(p).decode('ascii')})
-                elif isinstance(p, bool):
-                     formatted_args.append({"type": "integer", "value": "1" if p else "0"})
+                    formatted_args.append({"type": "blob", "value": base64.b64encode(p).decode("ascii")})
                 else:
                     formatted_args.append({"type": "text", "value": str(p)})
+
 
         try:
             rs = self._client.execute(sql, formatted_args)
