@@ -60,40 +60,38 @@ BASE_DIR = os.path.dirname(__file__)
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "cricshot-secret-key-12345")
 
-# Detect Turso DB configuration
-turso_url = os.getenv("TURSO_DATABASE_URL")
+# ── Turso / SQLite database setup ────────────────────────────────────────────
+turso_url        = os.getenv("TURSO_DATABASE_URL")
 turso_auth_token = os.getenv("TURSO_AUTH_TOKEN")
-db_uri = None
+_turso_engine    = None   # set below if Turso creds are present
 
-if turso_url:
-    # Use HTTPS for better compatibility across platforms (Windows/Linux)
-    base_url = turso_url.replace("libsql://", "https://")
-    
-    # Check for sqlalchemy-libsql dialect
+if turso_url and turso_auth_token:
     try:
-        from sqlalchemy.dialects import registry
-        registry.load("sqlite.libsql")
-        # Registry load succeeded: use sqlite+libsql://
-        db_uri = turso_url.replace("libsql://", "sqlite+libsql://")
-        if turso_auth_token:
-            db_uri += f"/?authToken={turso_auth_token}&secure=true"
-        print(f"✅ Turso DB detected: Using sqlalchemy-libsql dialect.")
-    except Exception:
-        # Fallback for Windows or missing driver
-        print("⚠️  sqlalchemy-libsql not found or incompatible. Falling back to local/temp SQLite.")
-        db_uri = None # Let the final assignment handle it correctly
+        from turso_db import make_turso_connection
+        _turso_creator = lambda: make_turso_connection(turso_url, turso_auth_token)
+        # Use a dummy sqlite URI; the real DBAPI connection comes via creator
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite+pysqlite://"
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "creator": _turso_creator,
+            "pool_pre_ping": False,   # libsql_client handles its own health
+        }
+        print("✅ Turso DB detected: Using libsql_client HTTP connection (no Rust required).")
+    except Exception as _te:
+        print(f"⚠️  Turso setup failed ({_te}). Falling back to local SQLite.")
+        turso_url = None
 
-# Final URI assignment fallback
-default_local_db = "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", db_uri or default_local_db)
+if not (turso_url and turso_auth_token) or "SQLALCHEMY_ENGINE_OPTIONS" not in app.config:
+    # Local SQLite fallback (dev or missing/failed Turso creds)
+    _default_local_db = "sqlite:////tmp/cricshot.db" if os.getenv("RENDER") else "sqlite:///cricshot.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", _default_local_db)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"timeout": 30},
+        "pool_pre_ping": True,
+    }
+    print(f"ℹ️  Using local SQLite: {app.config['SQLALCHEMY_DATABASE_URI']}")
+
 print(f"DEBUG: SQLALCHEMY_DATABASE_URI = {app.config['SQLALCHEMY_DATABASE_URI']}")
-
-
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "connect_args": {"timeout": 30},       # wait up to 30s for lock
-    "pool_pre_ping": True,
-}
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB
 # Security: session cookie settings
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -137,6 +135,8 @@ from sqlalchemy.engine import Engine as _Engine
 @event.listens_for(_Engine, "connect")
 def _set_sqlite_pragma(dbapi_conn, connection_record):
     import sqlite3
+    # Only apply WAL pragma to actual (local) sqlite3 connections.
+    # TursoConnection objects are not sqlite3.Connection instances — skip them.
     if isinstance(dbapi_conn, sqlite3.Connection):
         try:
             cursor = dbapi_conn.cursor()
