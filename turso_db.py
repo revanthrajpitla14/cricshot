@@ -136,6 +136,15 @@ class TursoCursor:
         if not sql:
             return
 
+        # SQLAlchemy's pysqlite dialect auto-sends SQLite PRAGMAs (e.g.
+        # PRAGMA read_uncommitted, PRAGMA journal_mode=WAL) on every connection.
+        # Turso's HTTP API rejects these with 404. Silently skip all PRAGMAs.
+        if sql.upper().startswith("PRAGMA"):
+            self.description = None
+            self._rows = []
+            self.rowcount = -1
+            return
+
         # Replace standard ? placeholders with indexed/libsql ones or send directly
         # Format params for libsql API:
         # libsql expects args as [{"type": "text", "value": "foo"}, ...]
