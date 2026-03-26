@@ -7,6 +7,8 @@ services:
     buildCommand: "chmod +x build.sh && ./build.sh"
     startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --preload"
     envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: MAIL_SERVER
         value: mail.smtp2go.com
       - key: MAIL_PORT

@@ -17,13 +17,20 @@ import uuid
 import random
 import datetime
 import logging
+import traceback
 
-# Force UTF-8 output on Windows so emoji/unicode in print() never crashes
-if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+# ── Unbuffered output: ensures ALL print/logging appears in Render logs ────────
+# Without this, Python buffers stdout and crash messages may never be flushed.
+os.environ.setdefault("PYTHONUNBUFFERED", "1")
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass
+
+# ── Matplotlib: point font cache to a writable tmp dir on Render ───────────────
+# This prevents a slow cache-build at worker startup that causes port-scan timeout.
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -309,9 +316,18 @@ def seed_shot_types():
 
 
 # Create DB tables and seed reference data
-with app.app_context():
-    db.create_all()
-    seed_shot_types()
+# Wrapped in try/except so any startup crash is fully printed to Render logs
+try:
+    with app.app_context():
+        db.create_all()
+        seed_shot_types()
+    print("[DB] Tables created and shot types seeded successfully.", flush=True)
+except Exception as _db_init_err:
+    print("[DB STARTUP ERROR] Failed to initialise database:", flush=True)
+    traceback.print_exc(file=sys.stdout)
+    sys.stdout.flush()
+    # Do NOT sys.exit() here — let Gunicorn still serve requests;
+    # the app will error gracefully on DB operations instead of refusing to start.
 
 
 # ═══════════════════════════════════════════════════════════════════════

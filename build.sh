@@ -15,3 +15,9 @@ apt-get install -y \
 # Install Python dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# Pre-build Matplotlib font cache so it doesn't block Gunicorn startup
+# (without this, the cache build can take 10-30s and trigger Render's port-scan timeout)
+echo "Pre-building Matplotlib font cache..."
+MPLCONFIGDIR=/tmp/matplotlib python -c "import matplotlib; matplotlib.font_manager._load_fontmanager(try_read_cache=False)"
+echo "Font cache build complete."
