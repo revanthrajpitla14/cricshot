@@ -319,7 +319,6 @@ def seed_shot_types():
 # Wrapped in try/except so any startup crash is fully printed to Render logs
 try:
     with app.app_context():
-        db.create_all()
         seed_shot_types()
     print("[DB] Tables created and shot types seeded successfully.", flush=True)
 except Exception as _db_init_err:
