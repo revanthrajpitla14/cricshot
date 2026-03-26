@@ -11,11 +11,7 @@ venv/
 
 # Database (SQLite - ephemeral on Render, don't commit)
 instance/
-*.db
-*.sqlite3
-
-# Training data (too large for GitHub)
-data/
+# *.db and data/ are now tracked — removed exclusions
 
 # Temp files
 /tmp/
