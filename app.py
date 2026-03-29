@@ -29,25 +29,53 @@ except Exception:
     pass
 
 # ── Matplotlib: point font cache to a writable tmp dir on Render ───────────────
-# This prevents a slow cache-build at worker startup that causes port-scan timeout.
+# Set this BEFORE any matplotlib import (which happens lazily inside predict.py).
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 from flask import Flask, request, jsonify, send_from_directory, session, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text # Added for raw SQL health checks
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
-try:
-    from predict import predict_image, predict_video, predict_frame
-    PREDICT_OK = True
-except Exception as _predict_import_err:
-    print(f"[WARN] predict.py failed to import: {_predict_import_err}")
-    PREDICT_OK = False
-    def predict_image(b): return {"error": "Prediction module unavailable on this server."}
-    def predict_video(b): return {"error": "Prediction module unavailable on this server."}
-    def predict_frame(b): return {"error": "Prediction module unavailable on this server."}
+
+# ── Lazy predict wrappers ──────────────────────────────────────────────────────
+# predict.py imports cv2, numpy, mediapipe, PIL, sklearn at module level — those
+# libraries take 10-40 s to load and would block Gunicorn from binding the port.
+# Instead we import the module on the FIRST actual prediction request.
+_predict_module = None
+_predict_load_error = None
+
+def _load_predict():
+    global _predict_module, _predict_load_error
+    if _predict_module is not None:
+        return True
+    if _predict_load_error is not None:
+        return False
+    try:
+        import predict as _pm
+        _predict_module = _pm
+        print("[predict] Module loaded successfully on first request.", flush=True)
+        return True
+    except Exception as _e:
+        _predict_load_error = str(_e)
+        print(f"[WARN] predict.py failed to import: {_e}", flush=True)
+        return False
+
+def predict_image(b):
+    if not _load_predict():
+        return {"error": "Prediction module unavailable on this server."}
+    return _predict_module.predict_image(b)
+
+def predict_video(b):
+    if not _load_predict():
+        return {"error": "Prediction module unavailable on this server."}
+    return _predict_module.predict_video(b)
+
+def predict_frame(b):
+    if not _load_predict():
+        return {"error": "Prediction module unavailable on this server."}
+    return _predict_module.predict_frame(b)
 
 import json
 
@@ -322,18 +350,44 @@ def seed_shot_types():
     db.session.commit()
 
 
-# Create DB tables and seed reference data
-# Wrapped in try/except so any startup crash is fully printed to Render logs
-try:
-    with app.app_context():
+# ── Deferred DB initialisation ────────────────────────────────────────────────
+# We do NOT call db.create_all() / seed_shot_types() synchronously at boot.
+# Instead:
+#   • Gunicorn/Render: run `flask seed-db` as a pre-deploy command, OR
+#   • Development : the first incoming request triggers _init_db() below.
+
+_db_initialised = False
+
+def _init_db():
+    """Create tables and seed shot types. Safe to call multiple times."""
+    global _db_initialised
+    if _db_initialised:
+        return
+    try:
+        db.create_all()
         seed_shot_types()
-    print("[DB] Tables created and shot types seeded successfully.", flush=True)
-except Exception as _db_init_err:
-    print("[DB STARTUP ERROR] Failed to initialise database:", flush=True)
-    traceback.print_exc(file=sys.stdout)
-    sys.stdout.flush()
-    # Do NOT sys.exit() here — let Gunicorn still serve requests;
-    # the app will error gracefully on DB operations instead of refusing to start.
+        _db_initialised = True
+        print("[DB] Tables created and shot types seeded successfully.", flush=True)
+    except Exception as _e:
+        print(f"[DB INIT ERROR] {_e}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        sys.stdout.flush()
+
+
+@app.before_request
+def _lazy_db_init():
+    """Initialise the DB on the very first request (skipped for /health)."""
+    if request.path == '/health':
+        return  # never block the health check
+    _init_db()
+
+
+@app.cli.command("seed-db")
+def seed_db_command():
+    """Flask CLI: create tables and seed shot types (run once per deploy)."""
+    with app.app_context():
+        _init_db()
+    print("[seed-db] Done.", flush=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════
