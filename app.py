@@ -31,7 +31,7 @@ except Exception:
 # ── Matplotlib: point font cache to a writable tmp dir on Render ───────────────
 # This prevents a slow cache-build at worker startup that causes port-scan timeout.
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
-from flask import Flask, request, jsonify, send_from_directory, session
+from flask import Flask, request, jsonify, send_from_directory, session, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text # Added for raw SQL health checks
@@ -62,9 +62,16 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-BASE_DIR = os.path.dirname(__file__)
+BASE_DIR       = os.path.dirname(__file__)
+TEMPLATES_DIR  = os.path.join(BASE_DIR, "templates")
+STATIC_DIR     = os.path.join(BASE_DIR, "static")
 
-app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
+app = Flask(
+    __name__,
+    static_folder=BASE_DIR,
+    static_url_path="",
+    template_folder=TEMPLATES_DIR,
+)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "cricshot-secret-key-12345")
 
 # ── Turso / SQLite database setup ────────────────────────────────────────────
@@ -490,22 +497,9 @@ def send_otp(user, otp):
 #  HEALTH CHECK
 # ═══════════════════════════════════════════════════════════════════════
 
-@app.route("/health")
-def health():
-    """Render health check — returns 200 JSON when server is ready."""
-    db_connected = False
-    try:
-        db.session.execute(text("SELECT 1"))
-        db_connected = True
-    except Exception:
-        pass
-    
-    return jsonify({
-        "status": "ok", 
-        "server": "cricshot",
-        "database": "connected" if db_connected else "disconnected",
-        "using_turso": os.getenv("TURSO_DATABASE_URL") is not None
-    }), 200
+@app.route('/health')
+def health_check():
+    return "OK", 200
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -734,6 +728,50 @@ def resend_otp():
 @app.route("/")
 def index():
     return send_from_directory(BASE_DIR, "index.html")
+
+
+# ── Auth page routes (serve Jinja templates) ──────────────────────────
+@app.route("/login")
+def page_login():
+    return render_template("login.html")
+
+
+@app.route("/register")
+def page_register():
+    return render_template("register.html")
+
+
+@app.route("/upload/image")
+def page_upload_image():
+    return render_template("upload_image.html")
+
+
+@app.route("/upload/video")
+def page_upload_video():
+    return render_template("upload_video.html")
+
+
+@app.route("/auth.css")
+def serve_auth_css():
+    return send_from_directory(STATIC_DIR, "auth.css")
+
+
+@app.route("/auth.js")
+def serve_auth_js():
+    return send_from_directory(STATIC_DIR, "auth.js")
+
+
+@app.route("/shots")
+def page_shot_library():
+    """Shot Library — browse all 18 shot types with YouTube tutorials."""
+    return render_template("shot_library.html")
+
+
+@app.route("/performance")
+def page_performance():
+    """Performance Metrics — live stats, shot distribution, prediction history."""
+    return render_template("performance.html")
+
 
 
 def _check_anon_quota():
@@ -1310,5 +1348,8 @@ def metrics():
     return jsonify(result)
 
 
-if __name__ == "__main__":
-    app.run(debug=True, port=5000, threaded=True)
+if __name__ == '__main__':
+    # Render sets the PORT environment variable automatically
+    import os
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
