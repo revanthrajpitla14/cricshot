@@ -370,8 +370,11 @@ def _init_db():
         return
 
     try:
-        import sqlalchemy
-        inspector = sqlalchemy.inspect(db.engine)
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        
+        # Check if the "users" table exists before creating tables or seeding.
+        # This prevents the Turso SQL Input Error: table users already exists
         if not inspector.has_table("users"):
             db.create_all()
             seed_shot_types()
@@ -379,11 +382,16 @@ def _init_db():
         else:
             print("[DB] Tables already exist, skipping creation.", flush=True)
             
-        _db_initialised = True
     except Exception as _e:
         print(f"[DB INIT ERROR] {_e}", flush=True)
+        import traceback, sys
         traceback.print_exc(file=sys.stdout)
         sys.stdout.flush()
+    finally:
+        # Make sure _db_initialised = True is set at the end of the block 
+        # so it never checks the database again for the lifespan of that worker,
+        # even if an error occurred temporarily.
+        _db_initialised = True
 
 
 @app.before_request
