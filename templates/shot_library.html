@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRICSHOT — Shot Library</title>
+  <meta name="description" content="Browse all 18 cricket shot types — detailed technique guides, key facts, coaching tips, and YouTube tutorial links." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    :root {
+      --neon: #00e88a; --neon-dim: #00b56e; --neon2: #00c8ff;
+      --gold: #fbbf24; --red: #ff4d6d;
+      --bg: #050d1a; --card: rgba(8,18,38,0.88); --modal: rgba(4,12,28,0.97);
+      --border: rgba(0,210,130,0.18); --border-g: rgba(0,210,130,0.38);
+      --txt: #e8f0ff; --txt2: #7a94be; --txt3: #3e5275;
+      --mono: 'JetBrains Mono', monospace; --main: 'Outfit', sans-serif;
+      --rad: 16px; --t: 0.26s cubic-bezier(.25,.8,.25,1);
+      --shadow: 0 8px 32px rgba(0,0,0,.55);
+      --glow: 0 0 28px rgba(0,232,138,.22);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--main); background: var(--bg); color: var(--txt); min-height: 100vh; overflow-x: hidden; }
+    #particles-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .25; }
+
+    /* ── Page ───────────────────────────────────────────────── */
+    .page-wrap { position: relative; z-index: 1; max-width: 1260px; margin: 0 auto; padding: 110px 32px 60px; }
+
+    /* ── Hero strip ─────────────────────────────────────────── */
+    .lib-hero { text-align: center; margin-bottom: 52px; }
+    .lib-hero h1 { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 900; letter-spacing: -2px; margin-bottom: 12px; }
+    .lib-hero p  { color: var(--txt2); font-size: 1rem; max-width: 520px; margin: 0 auto; line-height: 1.7; }
+    .hero-accent { background: linear-gradient(135deg, var(--neon) 0%, var(--neon2) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .hero-pills { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+    .hero-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 50px;
+      padding: 6px 16px; font-size: .78rem; color: var(--txt2); font-weight: 600;
+    }
+    .hero-pill span.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--neon); }
+
+    /* ── Filter / Search bar ────────────────────────────────── */
+    .filter-bar {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      background: var(--card); backdrop-filter: blur(20px);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 18px; margin-bottom: 36px;
+      box-shadow: var(--shadow);
+    }
+    .filter-search {
+      flex: 1; min-width: 200px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 16px 10px 40px;
+      color: var(--txt); font-size: .9rem; font-family: var(--main); outline: none;
+      transition: border-color var(--t), box-shadow var(--t);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='8' stroke='%233e5275' stroke-width='2'/%3E%3Cpath d='m21 21-4.35-4.35' stroke='%233e5275' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: 12px center;
+    }
+    .filter-search:focus { border-color: var(--neon); box-shadow: 0 0 0 3px rgba(0,232,138,.1); }
+    .filter-search::placeholder { color: var(--txt3); }
+
+    .filter-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 16px; font-size: .8rem; font-weight: 700; color: var(--txt2);
+      cursor: pointer; transition: all var(--t); font-family: var(--main); white-space: nowrap;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      background: rgba(0,232,138,.1); border-color: var(--neon-dim); color: var(--neon);
+    }
+    .filter-count { background: var(--card); border: 1px solid var(--border); border-radius: 50px; padding: 2px 10px; font-family: var(--mono); font-size: .68rem; color: var(--txt3); }
+
+    /* ── Shot Grid ──────────────────────────────────────────── */
+    .shot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .shot-tile {
+      background: var(--card); backdrop-filter: blur(16px);
+      border: 1px solid var(--border); border-radius: var(--rad);
+      padding: 24px 18px; cursor: pointer;
+      transition: all var(--t); position: relative; overflow: hidden;
+      box-shadow: var(--shadow);
+      animation: tile-in .35s ease both;
+    }
+    @keyframes tile-in { from{opacity:0;transform:scale(.95) translateY(8px);} to{opacity:1;transform:scale(1) translateY(0);} }
+    .shot-tile:hover {
+      border-color: var(--border-g); transform: translateY(-5px) scale(1.02);
+      box-shadow: var(--shadow), var(--glow);
+    }
+    .shot-tile::after {
+      content:''; position:absolute; inset:0;
+      background: linear-gradient(135deg, rgba(0,232,138,.05), transparent 60%);
+      opacity: 0; transition: opacity var(--t);
+    }
+    .shot-tile:hover::after { opacity: 1; }
+
+    /* category colour strip */
+    .shot-tile::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:3px;
+      background: linear-gradient(90deg, var(--neon-dim), var(--neon));
+    }
+    .shot-tile.cat-sweep::before   { background: linear-gradient(90deg,#0080aa,var(--neon2)); }
+    .shot-tile.cat-aerial::before  { background: linear-gradient(90deg,#b45309,var(--gold)); }
+    .shot-tile.cat-cut::before     { background: linear-gradient(90deg,#6d28d9,#a78bfa); }
+    .shot-tile.cat-spin::before    { background: linear-gradient(90deg,#047857,#34d399); }
+    .shot-tile.cat-wild::before    { background: linear-gradient(90deg,#9b1c2e,var(--red)); }
+    .shot-tile.cat-def::before     { background: linear-gradient(90deg,#374151,#9ca3af); }
+
+    .tile-emoji   { font-size: 2.4rem; margin-bottom: 12px; line-height: 1; display: block; }
+    .tile-name    { font-size: .97rem; font-weight: 800; margin-bottom: 5px; letter-spacing: -.2px; }
+    .tile-tag     { font-size: .65rem; color: var(--txt3); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; line-height: 1.3; }
+    .tile-arrow   { position: absolute; bottom: 14px; right: 14px; font-size: .8rem; color: var(--txt3); transition: all var(--t); }
+    .shot-tile:hover .tile-arrow { color: var(--neon); transform: translate(2px,-2px); }
+
+    /* ── No results ─────────────────────────────────────────── */
+    .no-results { text-align: center; padding: 80px 20px; color: var(--txt3); }
+    .no-results span { font-size: 3rem; display: block; margin-bottom: 12px; }
+
+    /* ═══════════════════════════════════════════════════════════
+       MODAL — full detail view with YouTube embed
+    ═══════════════════════════════════════════════════════════ */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(3,8,18,.85); backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      opacity: 0; pointer-events: none; transition: opacity .3s ease;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal-box {
+      background: var(--modal); border: 1px solid var(--border-g);
+      border-radius: 24px; width: 100%; max-width: 860px; max-height: 92vh;
+      overflow-y: auto; position: relative;
+      box-shadow: 0 24px 80px rgba(0,0,0,.8), var(--glow);
+      transform: scale(.94) translateY(20px);
+      transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+    }
+    .modal-overlay.open .modal-box { transform: scale(1) translateY(0); }
+    .modal-box::-webkit-scrollbar { width: 5px; }
+    .modal-box::-webkit-scrollbar-track { background: transparent; }
+    .modal-box::-webkit-scrollbar-thumb { background: var(--border-g); border-radius: 50px; }
+
+    /* ── Modal Header ────────────────────────────────────────── */
+    .modal-header {
+      padding: 32px 36px 0;
+      display: flex; align-items: flex-start; gap: 20px;
+      position: relative;
+    }
+    .modal-emoji {
+      font-size: 3.5rem; flex-shrink: 0;
+      background: rgba(0,232,138,.07); border: 1px solid var(--border-g);
+      border-radius: 16px; padding: 14px 18px; line-height: 1;
+      animation: emoji-pop .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes emoji-pop { from{transform:scale(0) rotate(-15deg);} to{transform:scale(1) rotate(0);} }
+
+    .modal-title-block { flex: 1; }
+    .modal-tag     { font-size: .65rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--neon); font-weight: 800; margin-bottom: 6px; }
+    .modal-name    { font-size: 2rem; font-weight: 900; letter-spacing: -1px; }
+    .modal-desc    { font-size: .87rem; color: var(--txt2); margin-top: 8px; line-height: 1.65; max-width: 480px; }
+    .modal-close {
+      position: absolute; top: 28px; right: 32px;
+      background: rgba(255,255,255,.06); border: 1px solid var(--border);
+      color: var(--txt2); width: 36px; height: 36px; border-radius: 50%;
+      font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all var(--t); font-family: var(--main);
+    }
+    .modal-close:hover { background: rgba(255,77,109,.15); border-color: rgba(255,77,109,.4); color: var(--red); }
+
+    /* ── Modal fact chips ────────────────────────────────────── */
+    .modal-facts { display: flex; flex-wrap: wrap; gap: 8px; padding: 20px 36px 0; }
+    .fact-chip {
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 10px; padding: 7px 14px;
+      font-size: .73rem; color: var(--txt3); display: flex; flex-direction: column; gap: 2px;
+    }
+    .fact-chip strong { color: var(--txt); font-size: .82rem; }
+    .fact-lbl { font-size: .6rem; text-transform: uppercase; letter-spacing: .7px; font-weight: 700; }
+
+    /* ── Modal Body ──────────────────────────────────────────── */
+    .modal-body { padding: 24px 36px; }
+    .modal-body p { color: var(--txt2); font-size: .88rem; line-height: 1.85; margin-bottom: 14px; }
+    .modal-body p:last-child { margin-bottom: 0; }
+
+    /* ── Modal Tips ──────────────────────────────────────────── */
+    .modal-tips-section { padding: 0 36px 28px; }
+    .modal-tips-title { font-size: .65rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--neon); font-weight: 800; margin-bottom: 12px; }
+    .modal-tips { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .modal-tips li {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: .83rem; color: var(--txt2); line-height: 1.55; padding: 10px 14px;
+      background: rgba(0,232,138,.04); border: 1px solid rgba(0,232,138,.1); border-radius: 10px;
+    }
+    .modal-tips li::before { content: '💡'; flex-shrink: 0; }
+
+    /* ── YouTube Section ─────────────────────────────────────── */
+    .yt-section { padding: 0 36px 36px; }
+    .yt-section-title { font-size: .65rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--red); font-weight: 800; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .yt-section-title::before { content: ''; display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: dot-pulse 2s ease infinite; }
+    @keyframes dot-pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+    /* ── YT Search embed (iFrame approach) ────────────────────── */
+    .yt-embed-wrap {
+      border-radius: 14px; overflow: hidden;
+      background: #000; aspect-ratio: 16/9;
+      border: 1px solid var(--border);
+      position: relative; margin-bottom: 12px;
+    }
+    .yt-embed-wrap iframe {
+      width: 100%; height: 100%; border: 0; display: block;
+    }
+    .yt-placeholder {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; cursor: pointer; background: rgba(0,0,0,.8);
+      transition: background var(--t);
+    }
+    .yt-placeholder:hover { background: rgba(0,0,0,.6); }
+    .yt-play-btn {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: #ff0000; display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; box-shadow: 0 0 30px rgba(255,0,0,.4);
+      transition: transform var(--t), box-shadow var(--t);
+    }
+    .yt-placeholder:hover .yt-play-btn { transform: scale(1.1); box-shadow: 0 0 40px rgba(255,0,0,.6); }
+    .yt-play-btn svg { width: 28px; height: 28px; fill: #fff; margin-left: 4px; }
+    .yt-ph-title { font-size: .9rem; font-weight: 700; color: var(--txt); }
+    .yt-ph-sub   { font-size: .75rem; color: var(--txt3); }
+
+    /* CTA buttons under YT embed */
+    .yt-cta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .yt-btn {
+      flex: 1; min-width: 160px;
+      padding: 12px 18px; border-radius: 10px; border: none;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: .85rem; font-weight: 700; cursor: pointer;
+      font-family: var(--main); transition: all var(--t); text-decoration: none;
+    }
+    .yt-btn.primary {
+      background: #ff0000; color: #fff;
+    }
+    .yt-btn.primary:hover { background: #cc0000; box-shadow: 0 4px 16px rgba(255,0,0,.4); transform: translateY(-2px); }
+    .yt-btn.secondary {
+      background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--txt2);
+    }
+    .yt-btn.secondary:hover { background: rgba(255,255,255,.1); color: var(--txt); }
+
+    .yt-icon { width: 20px; height: 20px; flex-shrink: 0; }
+
+    /* ── Next/Prev shot nav ──────────────────────────────────── */
+    .modal-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 36px 28px;
+    }
+    .nav-shot-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      color: var(--txt2); border-radius: 10px; padding: 10px 16px;
+      font-size: .8rem; font-weight: 700; cursor: pointer;
+      transition: all var(--t); font-family: var(--main); max-width: 200px;
+    }
+    .nav-shot-btn:hover { border-color: var(--neon); color: var(--neon); background: rgba(0,232,138,.06); }
+    .nav-shot-btn .nav-emoji { flex-shrink: 0; }
+    .nav-shot-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Category filter pills ───────────────────────────────── */
+    .cat-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .cat-pill {
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 50px; padding: 6px 14px; font-size: .76rem; font-weight: 700;
+      color: var(--txt2); cursor: pointer; transition: all var(--t);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .cat-pill:hover, .cat-pill.active {
+      background: rgba(0,232,138,.1); border-color: var(--neon-dim); color: var(--neon);
+    }
+    .cat-pill.active { border-color: var(--neon); }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .shot-grid { grid-template-columns: repeat(2,1fr); }
+      .modal-header { padding: 20px 20px 0; flex-wrap: wrap; }
+      .modal-body, .modal-tips-section, .yt-section, .modal-nav { padding-left: 20px; padding-right: 20px; }
+      .modal-facts { padding-left: 20px; padding-right: 20px; }
+      .modal-name { font-size: 1.5rem; }
+    }
+    @media (max-width: 480px) {
+      .shot-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .shot-tile { padding: 18px 14px; }
+      .tile-emoji { font-size: 1.8rem; }
+      .tile-name { font-size: .85rem; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="particles-canvas"></canvas>
+
+  <!-- ─── Navbar ──────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <a class="nav-brand" href="/"><span class="brand-name">CRICSHOT</span></a>
+    </div>
+    <div class="nav-center">
+      <a href="/"              class="nav-link">Home</a>
+      <a href="/upload/image"  class="nav-link">Image</a>
+      <a href="/upload/video"  class="nav-link">Video</a>
+      <a href="/shots"         class="nav-link active">Shot Library</a>
+      <a href="/performance"   class="nav-link">Metrics</a>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-auth" id="btn-auth-nav" onclick="location.href='/login'">Sign In</button>
+    </div>
+  </nav>
+
+  <!-- ─── Page ────────────────────────────────────────────────────── -->
+  <div class="page-wrap">
+
+    <!-- Hero -->
+    <div class="lib-hero">
+      <h1>🏏 <span class="hero-accent">Shot Library</span></h1>
+      <p>Master all 18 cricket shot types recognised by the CRICSHOT AI — with detailed technique breakdowns, coaching tips, and YouTube tutorials.</p>
+      <div class="hero-pills">
+        <div class="hero-pill"><span class="dot"></span>18 Shots</div>
+        <div class="hero-pill"><span class="dot"></span>Coaching Tips</div>
+        <div class="hero-pill"><span class="dot"></span>YouTube Tutorials</div>
+        <div class="hero-pill"><span class="dot"></span>Key Facts</div>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <input
+        type="search" id="shot-search"
+        class="filter-search"
+        placeholder="Search shots, tags, or technique…"
+        autocomplete="off"
+      />
+      <div class="cat-pills" id="cat-pills">
+        <button class="cat-pill active" data-cat="">All <span class="filter-count" id="count-all">18</span></button>
+        <button class="cat-pill" data-cat="drive">🏏 Drives</button>
+        <button class="cat-pill" data-cat="sweep">🧹 Sweeps</button>
+        <button class="cat-pill" data-cat="cut">📐 Cuts</button>
+        <button class="cat-pill" data-cat="aerial">🚀 Aerial</button>
+        <button class="cat-pill" data-cat="wild">🎩 Innovative</button>
+        <button class="cat-pill" data-cat="def">🛡 Defensive</button>
+      </div>
+    </div>
+
+    <!-- Shot Grid -->
+    <div class="shot-grid" id="shot-grid"></div>
+    <div class="no-results" id="no-results" style="display:none">
+      <span>🏏</span>
+      No shots match "<span id="no-results-q"></span>".<br>Try a different search term.
+    </div>
+
+  </div><!-- /.page-wrap -->
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SHOT DETAIL MODAL
+  ═══════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-name">
+    <div class="modal-box">
+
+      <!-- Header -->
+      <div class="modal-header">
+        <div class="modal-emoji" id="modal-emoji">🏏</div>
+        <div class="modal-title-block">
+          <div class="modal-tag" id="modal-tag">Cricket Shot</div>
+          <div class="modal-name" id="modal-name">Shot Name</div>
+          <div class="modal-desc" id="modal-desc"></div>
+        </div>
+        <button class="modal-close" id="modal-close" aria-label="Close modal">✕</button>
+      </div>
+
+      <!-- Key facts -->
+      <div class="modal-facts" id="modal-facts"></div>
+
+      <!-- Body text -->
+      <div class="modal-body" id="modal-body"></div>
+
+      <!-- Coaching tips -->
+      <div class="modal-tips-section">
+        <div class="modal-tips-title">Coaching Tips</div>
+        <ul class="modal-tips" id="modal-tips"></ul>
+      </div>
+
+      <!-- ── YouTube ─────────────────────────────────────────── -->
+      <div class="yt-section">
+        <div class="yt-section-title">Watch Tutorial on YouTube</div>
+
+        <!-- Embed wrapper — click to load iframe -->
+        <div class="yt-embed-wrap" id="yt-embed-wrap">
+          <div class="yt-placeholder" id="yt-placeholder">
+            <div class="yt-play-btn">
+              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+            <div class="yt-ph-title" id="yt-ph-title">Watch YouTube Tutorial</div>
+            <div class="yt-ph-sub">Click to search for this shot on YouTube</div>
+          </div>
+          <!-- iframe injected here when clicked -->
+        </div>
+
+        <!-- CTA buttons -->
+        <div class="yt-cta-row">
+          <a class="yt-btn primary" id="yt-search-btn" href="#" target="_blank" rel="noopener noreferrer">
+            <svg class="yt-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            <span>Search YouTube</span>
+          </a>
+          <a class="yt-btn secondary" id="yt-shorts-btn" href="#" target="_blank" rel="noopener noreferrer">
+            <span>📱</span>
+            <span>Shorts / Quick Tips</span>
+          </a>
+          <button class="yt-btn secondary" id="btn-predict-this" onclick="location.href='/'">
+            <span>🎯</span>
+            <span>Predict This Shot</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Prev / Next nav -->
+      <div class="modal-nav">
+        <button class="nav-shot-btn" id="btn-prev-shot">
+          <span class="nav-emoji" id="prev-emoji">←</span>
+          <span class="nav-shot-name" id="prev-name">Previous</span>
+        </button>
+        <span style="font-size:.72rem;color:var(--txt3)" id="modal-position">1 / 18</span>
+        <button class="nav-shot-btn" id="btn-next-shot">
+          <span class="nav-shot-name" id="next-name">Next</span>
+          <span class="nav-emoji" id="next-emoji">→</span>
+        </button>
+      </div>
+
+    </div><!-- /.modal-box -->
+  </div><!-- /.modal-overlay -->
+
+  <script src="/script.js"></script>
+  <script>
+    // ═══════════════════════════════════════════════════════════════════
+    //  SHOT LIBRARY — page logic
+    //  Pulls SHOT_META and SHOT_DETAIL from script.js (already loaded)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ── Shot categories map ───────────────────────────────────────────
+    const SHOT_CATS = {
+      'Cover Drive':    ['drive'],
+      'Straight Drive': ['drive'],
+      'drive':          ['drive'],
+      'Defensive':      ['def'],
+      'Sweep':          ['sweep'],
+      'Reverse Sweep':  ['sweep','wild'],
+      'Square Cut':     ['cut'],
+      'Late Cut':       ['cut'],
+      'Pull':           ['cut'],
+      'pullshot':       ['cut'],
+      'Hook':           ['cut'],
+      'Lofted Offside': ['aerial','drive'],
+      'Lofted Legside': ['aerial'],
+      'Upper Cut':      ['aerial'],
+      'Scoop':          ['wild','aerial'],
+      'Flick':          ['sweep'],
+      'legglance-flick':['sweep'],
+      'Down The Wicket':['wild'],
+    };
+
+    const ALL_SHOT_NAMES = Object.keys(typeof SHOT_META !== 'undefined' ? SHOT_META : {});
+
+    // Fallback SHOT_META in case script.js doesn't define it (standalone mode)
+    const _META = (typeof SHOT_META !== 'undefined') ? SHOT_META : {};
+    const _DETAIL = (typeof SHOT_DETAIL !== 'undefined') ? SHOT_DETAIL : {};
+
+    // ── Tile category CSS class ────────────────────────────────────────
+    function tileCatClass(shot) {
+      const cats = SHOT_CATS[shot] || [];
+      if (cats.includes('def'))   return 'cat-def';
+      if (cats.includes('aerial'))return 'cat-aerial';
+      if (cats.includes('wild'))  return 'cat-wild';
+      if (cats.includes('sweep')) return 'cat-sweep';
+      if (cats.includes('cut'))   return 'cat-cut';
+      if (cats.includes('drive')) return '';
+      return '';
+    }
+
+    // ── Tile tag line (short) ─────────────────────────────────────────
+    function shortTag(shot) {
+      const d = _DETAIL[shot];
+      return d ? d.tag.split('·')[0].trim() : '';
+    }
+
+    // ── Filter state ──────────────────────────────────────────────────
+    let _activeCat = '';
+    let _searchQ   = '';
+    let _curIdx    = 0;   // current open shot index
+
+    function filteredShots() {
+      return ALL_SHOT_NAMES.filter(s => {
+        const matchCat = !_activeCat || (SHOT_CATS[s] || []).includes(_activeCat);
+        const haystack = (s + ' ' + ((_META[s]||{}).desc||'') + ' ' + ((_DETAIL[s]||{}).tag||'')).toLowerCase();
+        const matchQ   = !_searchQ  || haystack.includes(_searchQ);
+        return matchCat && matchQ;
+      });
+    }
+
+    // ── Build grid ────────────────────────────────────────────────────
+    function buildGrid() {
+      const grid   = document.getElementById('shot-grid');
+      const noRes  = document.getElementById('no-results');
+      const shots  = filteredShots();
+
+      grid.innerHTML = '';
+      if (!shots.length) {
+        noRes.style.display = 'block';
+        document.getElementById('no-results-q').textContent = _searchQ || _activeCat;
+        return;
+      }
+      noRes.style.display = 'none';
+
+      shots.forEach((shot, i) => {
+        const meta = _META[shot] || { emoji: '🏏', desc: '' };
+        const tile = document.createElement('div');
+        tile.className = `shot-tile ${tileCatClass(shot)}`;
+        tile.style.animationDelay = `${i * 30}ms`;
+        tile.setAttribute('role', 'button');
+        tile.setAttribute('tabindex', '0');
+        tile.setAttribute('aria-label', `Open ${shot} shot details`);
+        tile.innerHTML = `
+          <span class="tile-emoji">${meta.emoji}</span>
+          <div class="tile-name">${shot}</div>
+          <div class="tile-tag">${shortTag(shot)}</div>
+          <span class="tile-arrow">→</span>
+        `;
+        tile.addEventListener('click', () => openModal(shot));
+        tile.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') openModal(shot); });
+        grid.appendChild(tile);
+      });
+
+      document.getElementById('count-all').textContent = shots.length;
+    }
+
+    // ── Category pills ────────────────────────────────────────────────
+    document.querySelectorAll('.cat-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        _activeCat = pill.dataset.cat;
+        buildGrid();
+      });
+    });
+
+    // ── Search ────────────────────────────────────────────────────────
+    document.getElementById('shot-search').addEventListener('input', e => {
+      _searchQ = e.target.value.toLowerCase().trim();
+      buildGrid();
+    });
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  MODAL
+    // ═══════════════════════════════════════════════════════════════════
+
+    const overlay  = document.getElementById('modal-overlay');
+    const closeBtn = document.getElementById('modal-close');
+
+    function openModal(shot) {
+      _curIdx = ALL_SHOT_NAMES.indexOf(shot);
+      if (_curIdx < 0) _curIdx = 0;
+      populateModal(shot);
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      closeBtn.focus();
+    }
+
+    function closeModal() {
+      overlay.classList.remove('open');
+      document.body.style.overflow = '';
+      // Remove any injected iframe to stop YT audio on close
+      const iframes = document.querySelectorAll('#yt-embed-wrap iframe');
+      iframes.forEach(f => f.remove());
+      document.getElementById('yt-placeholder').style.display = 'flex';
+    }
+
+    function populateModal(shot) {
+      const meta   = _META[shot]   || { emoji:'🏏', desc:'' };
+      const detail = _DETAIL[shot] || { tag:'', facts:[], body:['No description available.'], tips:[], youtube:'' };
+
+      document.getElementById('modal-emoji').textContent = meta.emoji;
+      document.getElementById('modal-tag').textContent   = detail.tag || 'Cricket Shot';
+      document.getElementById('modal-name').textContent  = shot;
+      document.getElementById('modal-desc').textContent  = meta.desc || '';
+
+      // Facts
+      document.getElementById('modal-facts').innerHTML = (detail.facts||[]).map(f =>
+        `<div class="fact-chip"><div class="fact-lbl">${f.label}</div><strong>${f.val}</strong></div>`
+      ).join('');
+
+      // Body
+      document.getElementById('modal-body').innerHTML = (detail.body||[]).map(p => `<p>${p}</p>`).join('');
+
+      // Tips
+      document.getElementById('modal-tips').innerHTML = (detail.tips||[]).map(t => `<li>${t}</li>`).join('');
+
+      // ── YouTube setup ────────────────────────────────────────────────
+      const rawQuery = detail.youtube || `${shot} cricket shot batting tutorial`;
+      const searchUrl  = `https://www.youtube.com/results?search_query=${encodeURIComponent(rawQuery)}`;
+      const shortsUrl  = `https://www.youtube.com/results?search_query=${encodeURIComponent(rawQuery + ' shorts')}`;
+
+      document.getElementById('yt-search-btn').href = searchUrl;
+      document.getElementById('yt-shorts-btn').href = shortsUrl;
+      document.getElementById('yt-ph-title').textContent = `▶ ${shot} — Cricket Tutorial`;
+
+      // Reset placeholder (remove any old iframe)
+      document.querySelectorAll('#yt-embed-wrap iframe').forEach(f => f.remove());
+      document.getElementById('yt-placeholder').style.display = 'flex';
+
+      // Click placeholder → embed YouTube search results iframe
+      document.getElementById('yt-placeholder').onclick = () => loadYTEmbed(rawQuery);
+
+      // ── Navigation labels ─────────────────────────────────────────────
+      const prevshot = ALL_SHOT_NAMES[(_curIdx - 1 + ALL_SHOT_NAMES.length) % ALL_SHOT_NAMES.length];
+      const nextshot = ALL_SHOT_NAMES[(_curIdx + 1) % ALL_SHOT_NAMES.length];
+      const prevMeta = _META[prevshot] || { emoji:'🏏' };
+      const nextMeta = _META[nextshot] || { emoji:'🏏' };
+
+      document.getElementById('prev-emoji').textContent = prevMeta.emoji;
+      document.getElementById('prev-name').textContent  = prevshot;
+      document.getElementById('next-emoji').textContent = nextMeta.emoji;
+      document.getElementById('next-name').textContent  = nextshot;
+      document.getElementById('modal-position').textContent = `${_curIdx + 1} / ${ALL_SHOT_NAMES.length}`;
+    }
+
+    // ── Load YT embed (search results iframe) ─────────────────────────
+    // YouTube doesn't allow embedding search results pages via iframe directly,
+    // so we open a proper YouTube search in a new tab via the placeholder click,
+    // and embed a representative tutorial video using YouTube's no-cookie embed.
+    // For a real video ID fallback, we provide the search CTA.
+    function loadYTEmbed(query) {
+      // Show informative overlay directing to YouTube search (because YT search
+      // results pages block iframe embedding). We embed YouTube's landing page
+      // via the /embed/videoseries approach which IS allowed.
+
+      const ph  = document.getElementById('yt-placeholder');
+      const wrap = document.getElementById('yt-embed-wrap');
+
+      // Build a videoseries embed with the query as playlist
+      // Using YouTube's allowed /embed endpoint
+      const searchEncoded = encodeURIComponent(query);
+
+      // Embed using YouTube's native search via no-cookie share URL
+      ph.style.display = 'none';
+      const frame = document.createElement('iframe');
+      frame.src = `https://www.youtube-nocookie.com/embed?listType=search&list=${searchEncoded}&autoplay=1&rel=0&modestbranding=1`;
+      frame.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      frame.allowFullscreen = true;
+      frame.style.cssText = 'width:100%;height:100%;border:0;display:block;';
+      wrap.appendChild(frame);
+    }
+
+    // ── Prev / Next shot ──────────────────────────────────────────────
+    document.getElementById('btn-prev-shot').addEventListener('click', () => {
+      _curIdx = (_curIdx - 1 + ALL_SHOT_NAMES.length) % ALL_SHOT_NAMES.length;
+      populateModal(ALL_SHOT_NAMES[_curIdx]);
+    });
+    document.getElementById('btn-next-shot').addEventListener('click', () => {
+      _curIdx = (_curIdx + 1) % ALL_SHOT_NAMES.length;
+      populateModal(ALL_SHOT_NAMES[_curIdx]);
+    });
+
+    // ── Close modal ───────────────────────────────────────────────────
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+      if (e.key === 'ArrowRight' && overlay.classList.contains('open')) {
+        _curIdx = (_curIdx + 1) % ALL_SHOT_NAMES.length;
+        populateModal(ALL_SHOT_NAMES[_curIdx]);
+      }
+      if (e.key === 'ArrowLeft' && overlay.classList.contains('open')) {
+        _curIdx = (_curIdx - 1 + ALL_SHOT_NAMES.length) % ALL_SHOT_NAMES.length;
+        populateModal(ALL_SHOT_NAMES[_curIdx]);
+      }
+    });
+
+    // ── Particle canvas fallback ──────────────────────────────────────
+    (function() {
+      const cv = document.getElementById('particles-canvas');
+      if (!cv) return;
+      const cx = cv.getContext('2d');
+      let W,H,pts=[];
+      function rs(){W=cv.width=innerWidth;H=cv.height=innerHeight;}
+      function mk(){return{x:Math.random()*W,y:Math.random()*H,r:Math.random()*2+.5,dx:Math.random()*.4-.2,dy:-(Math.random()*.35+.05),a:Math.random()*.55+.1};}
+      rs(); window.addEventListener('resize',rs);
+      for(let i=0;i<75;i++)pts.push(mk());
+      (function loop(){
+        cx.clearRect(0,0,W,H);
+        pts.forEach(p=>{cx.globalAlpha=p.a;cx.fillStyle='#00e88a';cx.beginPath();cx.arc(p.x,p.y,p.r,0,Math.PI*2);cx.fill();p.x+=p.dx;p.y+=p.dy;p.a-=.001;if(p.a<=0||p.y<-5)Object.assign(p,mk(),{y:H,a:Math.random()*.5+.1});});
+        cx.globalAlpha=1; requestAnimationFrame(loop);
+      })();
+    })();
+
+    // ── URL hash navigation (#cover-drive → open modal) ──────────────
+    function maybeOpenFromHash() {
+      const hash = decodeURIComponent(location.hash.slice(1)).toLowerCase();
+      if (!hash) return;
+      const match = ALL_SHOT_NAMES.find(s => s.toLowerCase().replace(/\s+/g,'-') === hash);
+      if (match) setTimeout(() => openModal(match), 400);
+    }
+
+    // ── INIT ──────────────────────────────────────────────────────────
+    buildGrid();
+    maybeOpenFromHash();
+    window.addEventListener('hashchange', maybeOpenFromHash);
+  </script>
+</body>
+</html>

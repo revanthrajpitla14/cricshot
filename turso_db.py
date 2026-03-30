@@ -138,12 +138,17 @@ class TursoCursor:
 
         # SQLAlchemy's pysqlite dialect auto-sends SQLite PRAGMAs (e.g.
         # PRAGMA read_uncommitted, PRAGMA journal_mode=WAL) on every connection.
-        # Turso's HTTP API rejects these with 404. Silently skip all PRAGMAs.
-        if sql.upper().startswith("PRAGMA"):
-            self.description = None
-            self._rows = []
-            self.rowcount = -1
-            return
+        # Turso's HTTP API rejects these with 404. We skip connection PRAGMAs but
+        # MUST allow informational PRAGMAs like table_info so inspector.has_table() works.
+        upper_sql = sql.upper().strip()
+        if upper_sql.startswith("PRAGMA"):
+            # If it's trying to SET a pragma (has '=') or is a known connection pragma:
+            if "=" in upper_sql or "JOURNAL_MODE" in upper_sql or "READ_UNCOMMITTED" in upper_sql or "SYNCHRONOUS" in upper_sql:
+                self.description = None
+                self._rows = []
+                self.rowcount = -1
+                return
+            # Otherwise let it pass through to Turso (e.g. PRAGMA main.table_info)
 
         # Replace standard ? placeholders with indexed/libsql ones or send directly
         # Format params for libsql API:

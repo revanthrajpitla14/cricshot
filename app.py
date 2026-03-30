@@ -361,13 +361,25 @@ _db_initialised = False
 def _init_db():
     """Create tables and seed shot types. Safe to call multiple times."""
     global _db_initialised
+    
+    from flask import has_request_context, request
+    if has_request_context() and request.path == '/health':
+        return
+
     if _db_initialised:
         return
+
     try:
-        db.create_all()
-        seed_shot_types()
+        import sqlalchemy
+        inspector = sqlalchemy.inspect(db.engine)
+        if not inspector.has_table("users"):
+            db.create_all()
+            seed_shot_types()
+            print("[DB] Tables created and shot types seeded successfully.", flush=True)
+        else:
+            print("[DB] Tables already exist, skipping creation.", flush=True)
+            
         _db_initialised = True
-        print("[DB] Tables created and shot types seeded successfully.", flush=True)
     except Exception as _e:
         print(f"[DB INIT ERROR] {_e}", flush=True)
         traceback.print_exc(file=sys.stdout)

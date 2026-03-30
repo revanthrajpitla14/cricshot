@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRICSHOT — Upload Video</title>
+  <meta name="description" content="Upload a cricket batting video and let AI analyse shot type, frame by frame, with pose estimation." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* ── Video-upload page styles ─────────────────────────────────── */
+    .upload-page {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      max-width: 1100px; margin: 0 auto;
+      padding: 100px 48px 60px;
+    }
+    .upload-header { text-align: center; margin-bottom: 52px; }
+    .upload-header h1 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; letter-spacing: -1.5px; margin-bottom: 10px; }
+    .upload-header p  { color: var(--text-secondary); font-size: 1rem; }
+
+    .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+
+    /* ── Tips banner ─────────────────────────────────────────────── */
+    .video-tips {
+      background: rgba(0,200,255,0.05); border: 1px solid rgba(0,200,255,0.2);
+      border-radius: 14px; padding: 14px 18px; margin-bottom: 20px;
+    }
+    .video-tips-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: var(--neon2); margin-bottom: 8px; }
+    .video-tips ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+    .video-tips li { font-size: 0.83rem; color: var(--text-secondary); padding-left: 16px; position:relative; }
+    .video-tips li::before { content: '›'; position:absolute; left:0; color:var(--neon2); font-weight:700; }
+
+    /* ── Drop zone ────────────────────────────────────────────────── */
+    .video-drop-zone {
+      border: 2px dashed var(--border); border-radius: 20px; overflow: hidden;
+      background: var(--bg-card); backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-card); transition: all var(--transition); cursor: pointer;
+    }
+    .video-drop-zone:hover, .video-drop-zone.drag-over {
+      border-color: var(--neon); background: rgba(0,232,138,0.03);
+      box-shadow: var(--shadow-card), var(--shadow-glow);
+    }
+    .drop-innerpad { padding: 44px 28px; text-align: center; }
+    .dz-cloud { width: 80px; height: 80px; margin: 0 auto 18px; background: rgba(0,232,138,0.07); border: 1px solid rgba(0,232,138,0.22); border-radius: 50%; display: flex; align-items:center; justify-content:center; font-size:2.2rem; transition: all var(--transition); }
+    .video-drop-zone:hover .dz-cloud { background: rgba(0,232,138,0.14); transform: translateY(-4px); }
+    .dz-title { font-size:1.15rem; font-weight:700; margin-bottom:6px; }
+    .dz-sub   { color: var(--text-secondary); font-size:0.9rem; margin-bottom:6px; }
+    .dz-limit { font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono); margin-bottom:16px; }
+    .dz-formats { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin: 12px 0 20px; }
+    .fmt-badge  { background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:50px; padding:4px 12px; font-size:0.72rem; font-family:var(--font-mono); color:var(--text-muted); }
+    .btn-choose { background: linear-gradient(135deg,var(--neon-dim),var(--neon)); color:#000; border:none; border-radius:10px; padding:12px 28px; font-size:0.93rem; font-weight:700; cursor:pointer; font-family:var(--font-main); transition:all var(--transition); }
+    .btn-choose:hover { box-shadow: 0 6px 20px rgba(0,232,138,0.4); transform: translateY(-2px); }
+
+    /* Video preview */
+    .vid-preview { display:none; border-top: 1px solid var(--border); background: #000; position: relative; }
+    .vid-preview.visible { display: block; }
+    .vid-player  { width:100%; max-height:260px; display:block; }
+    .vid-clear   { position:absolute; top:10px; right:10px; background:rgba(255,77,109,0.15); border:1px solid rgba(255,77,109,0.35); color:var(--accent-red); border-radius:8px; padding:6px 14px; font-size:0.8rem; font-weight:600; cursor:pointer; transition:all var(--transition); font-family:var(--font-main); }
+    .vid-clear:hover { background: rgba(255,77,109,0.28); }
+
+    /* Meta bar */
+    .file-meta-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 18px; border-top:1px solid var(--border); background:rgba(255,255,255,0.02); font-size:0.78rem; }
+    .meta-chip { display:flex; align-items:center; gap:5px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:50px; padding:3px 10px; color:var(--text-muted); font-family:var(--font-mono); }
+
+    /* ── Progress bar ─────────────────────────────────────────────── */
+    .process-bar-wrap { margin-top: 20px; display: none; }
+    .process-bar-wrap.visible { display: block; }
+    .process-label { display: flex; justify-content: space-between; margin-bottom: 7px; font-size: 0.8rem; }
+    .process-lbl-txt  { color: var(--text-secondary); font-weight: 600; }
+    .process-lbl-pct  { color: var(--neon); font-family: var(--font-mono); font-weight: 700; }
+    .process-track { height:9px; background:rgba(255,255,255,0.06); border-radius:50px; overflow:hidden; }
+    .process-fill  { height:100%; background: linear-gradient(90deg,var(--neon-dim),var(--neon)); border-radius:50px; transition:width 0.5s ease; box-shadow:0 0 10px rgba(0,232,138,0.4); }
+
+    /* ── Action bar ──────────────────────────────────────────────── */
+    .upload-actions { display:flex; flex-direction:column; gap:12px; margin-top:20px; }
+    .btn-analyse { width:100%; padding:17px; font-size:1rem; font-weight:800; font-family:var(--font-main); border:none; border-radius:14px; background:linear-gradient(135deg,#00b56e,#00e88a,#00c8ff); background-size:200% 100%; color:#000; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:all var(--transition); letter-spacing:0.3px; }
+    .btn-analyse:hover:not(:disabled) { background-position:100% 0; box-shadow:0 8px 30px rgba(0,232,138,0.5); transform:translateY(-2px); }
+    .btn-analyse:disabled { opacity:0.38; cursor:not-allowed; transform:none; }
+    .analyse-note { text-align:center; font-size:0.75rem; color:var(--text-muted); }
+    .analyse-note code { background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:4px; font-family:var(--font-mono); color:var(--neon2); font-size:0.72rem; }
+    .btn-spin { width:18px; height:18px; border:2.5px solid rgba(0,0,0,0.2); border-top-color:#000; border-radius:50%; animation:spin 0.8s linear infinite; display:inline-block; }
+    @keyframes spin { to{transform:rotate(360deg);} }
+
+    /* ── Result panel ─────────────────────────────────────────────── */
+    .result-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:28px; box-shadow:var(--shadow-card); backdrop-filter:blur(20px); min-height:460px; display:flex; flex-direction:column; gap:14px; }
+
+    .rp-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; }
+    .rp-empty-icon { font-size:3.5rem; animation: float-icon 3s ease-in-out infinite; }
+    @keyframes float-icon {0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+    .rp-empty-title { font-size:1.05rem; font-weight:700; color:var(--text-secondary); }
+    .rp-empty-sub   { font-size:0.85rem; color:var(--text-muted); max-width:240px; line-height:1.65; }
+
+    .rp-loading { flex:1; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center; }
+    .ai-ring-wrap { position:relative; width:72px; height:72px; }
+    .ai-ring { position:absolute; inset:0; border-radius:50%; border:3px solid rgba(0,232,138,0.15); border-top-color:var(--neon); animation:spin 1.1s linear infinite; }
+    .ai-ring-icon { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.9rem; }
+
+    .rp-result { display:none; flex-direction:column; gap:14px; animation:fade-up 0.5s ease; }
+    @keyframes fade-up{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+
+    .shot-banner { background:linear-gradient(135deg,rgba(0,232,138,0.09),rgba(0,200,255,0.06)); border:1px solid var(--border-glow); border-radius:14px; padding:18px 20px; display:flex; align-items:center; gap:16px; }
+    .sb-emoji { font-size:2.5rem; flex-shrink:0; }
+    .sb-info  { flex:1; }
+    .sb-label { font-size:0.65rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted); font-weight:700; margin-bottom:3px; }
+    .sb-name  { font-size:1.5rem; font-weight:900; color:var(--neon); letter-spacing:-0.5px; }
+    .sb-conf  { font-size:1.1rem; font-weight:800; color:var(--neon); background:rgba(0,232,138,0.12); border:1px solid rgba(0,232,138,0.3); border-radius:8px; padding:8px 14px; font-family:var(--font-mono); }
+
+    .conf-row { display:flex; justify-content:space-between; margin-bottom:8px; }
+    .conf-lbl { font-size:0.78rem; color:var(--text-secondary); font-weight:600; }
+    .conf-val { font-size:0.78rem; color:var(--neon); font-family:var(--font-mono); font-weight:700; }
+    .conf-track { height:8px; background:rgba(255,255,255,0.06); border-radius:50px; overflow:hidden; }
+    .conf-fill  { height:100%; background:linear-gradient(90deg,var(--neon-dim),var(--neon)); border-radius:50px; transition:width 1.2s cubic-bezier(0.25,0.46,0.45,0.94); box-shadow:0 0 10px rgba(0,232,138,0.4); }
+
+    /* Video meta pills */
+    .vid-meta-pills { display:flex; gap:8px; flex-wrap:wrap; }
+    .vid-pill { background:rgba(0,200,255,0.07); border:1px solid rgba(0,200,255,0.25); border-radius:50px; padding:4px 12px; font-size:0.74rem; color:var(--neon2); font-family:var(--font-mono); }
+
+    .shot-desc { background:rgba(255,255,255,0.03); border-left:3px solid var(--neon); border-radius:0 12px 12px 0; padding:12px 16px; font-size:0.85rem; color:var(--text-secondary); line-height:1.7; }
+
+    .sec-lbl { font-size:0.7rem; text-transform:uppercase; letter-spacing:1.2px; font-weight:700; color:var(--text-muted); margin-bottom:8px; }
+    .top5-list { display:flex; flex-direction:column; gap:7px; }
+    .top5-row  { display:flex; align-items:center; gap:10px; }
+    .t5-rank { width:20px; text-align:right; font-size:0.72rem; color:var(--text-muted); font-family:var(--font-mono); flex-shrink:0; }
+    .t5-bar-w{ flex:1; height:6px; background:rgba(255,255,255,0.05); border-radius:50px; overflow:hidden; }
+    .t5-bar  { height:100%; border-radius:50px; transition:width 1s ease 0.2s; }
+    .t5-bar.r1{background:linear-gradient(90deg,#00b56e,#00e88a);}
+    .t5-bar.r2{background:linear-gradient(90deg,#0099cc,#00c8ff);}
+    .t5-bar.r3{background:rgba(255,255,255,0.22);}
+    .t5-bar.r4{background:rgba(255,255,255,0.13);}
+    .t5-bar.r5{background:rgba(255,255,255,0.07);}
+    .t5-name { width:110px; font-size:0.76rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; text-align:right; }
+    .t5-pct  { width:38px; font-size:0.72rem; font-family:var(--font-mono); color:var(--text-muted); text-align:right; flex-shrink:0; }
+
+    .rp-error { display:none; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:14px; text-align:center; min-height:200px; }
+    .rp-error-icon { font-size:3rem; }
+    .rp-error-msg  { color:var(--accent-red); font-size:0.93rem; max-width:280px; line-height:1.6; }
+    .btn-retry { background:rgba(255,77,109,0.1); border:1px solid rgba(255,77,109,0.3); color:var(--accent-red); padding:10px 24px; border-radius:9px; font-size:0.9rem; font-weight:600; cursor:pointer; transition:all var(--transition); font-family:var(--font-main); }
+    .btn-retry:hover { background:rgba(255,77,109,0.2); }
+
+    @media (max-width: 900px) {
+      .upload-grid { grid-template-columns:1fr; }
+      .upload-page { padding:80px 20px 40px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="particles-canvas"></canvas>
+
+  <!-- ─── Navbar ──────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <a class="nav-brand" href="/"><span class="brand-name">CRICSHOT</span></a>
+    </div>
+    <div class="nav-center">
+      <a href="/"               class="nav-link">Home</a>
+      <a href="/upload/image"   class="nav-link">Image Upload</a>
+      <a href="/upload/video"   class="nav-link">Video Upload</a>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-auth" id="btn-auth-nav">Sign In</button>
+    </div>
+  </nav>
+
+  <!-- ─── Main ────────────────────────────────────────────────────── -->
+  <main class="upload-page">
+    <div class="upload-header">
+      <h1>🎬 Video Shot Analysis</h1>
+      <p>Upload a short cricket batting clip — AI analyses every frame and identifies the dominant shot</p>
+    </div>
+
+    <div class="upload-grid">
+      <!-- ── Left: Upload + Tips ──────────────────────────────────── -->
+      <div>
+        <!-- Tips banner -->
+        <div class="video-tips">
+          <div class="video-tips-title">💡 For best results</div>
+          <ul>
+            <li>Keep clip under 30 seconds (faster processing)</li>
+            <li>Ensure the batsman's full body is visible</li>
+            <li>Steady camera, good lighting</li>
+            <li>MP4 or MOV recommended</li>
+          </ul>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="video-drop-zone" id="drop-zone" role="button" tabindex="0">
+          <!-- Video preview (hidden by default) -->
+          <div class="vid-preview" id="vid-preview">
+            <video class="vid-player" id="vid-player" controls></video>
+            <button class="vid-clear" id="btn-vid-clear">✕ Remove</button>
+          </div>
+
+          <!-- Drop UI -->
+          <div class="drop-innerpad" id="drop-ui">
+            <div class="dz-cloud">🎬</div>
+            <div class="dz-title">Drop your video here</div>
+            <div class="dz-sub">or click to browse from your device</div>
+            <div class="dz-limit">Max file size: 200 MB</div>
+            <div class="dz-formats">
+              <span class="fmt-badge">MP4</span>
+              <span class="fmt-badge">AVI</span>
+              <span class="fmt-badge">MOV</span>
+              <span class="fmt-badge">MKV</span>
+              <span class="fmt-badge">WMV</span>
+            </div>
+            <button class="btn-choose" id="btn-choose">Choose Video</button>
+            <input type="file" id="file-input" accept="video/mp4,video/avi,video/quicktime,video/x-matroska,video/x-ms-wmv" hidden />
+          </div>
+
+          <!-- Meta bar -->
+          <div class="file-meta-bar" id="file-meta-bar" style="display:none">
+            <div class="meta-chip" id="meta-name">—</div>
+            <div class="meta-chip" id="meta-size">—</div>
+          </div>
+        </div>
+
+        <!-- Processing progress (shown during upload/analysis) -->
+        <div class="process-bar-wrap" id="process-bar-wrap">
+          <div class="process-label">
+            <span class="process-lbl-txt" id="process-lbl-txt">Uploading…</span>
+            <span class="process-lbl-pct" id="process-lbl-pct">0%</span>
+          </div>
+          <div class="process-track"><div class="process-fill" id="process-fill" style="width:0%"></div></div>
+        </div>
+
+        <!-- Action bar -->
+        <div class="upload-actions">
+          <button class="btn-analyse" id="btn-analyse" disabled>
+            <span class="btn-text">🎯 Analyse Video</span>
+            <span class="btn-spin" id="btn-spin" style="display:none"></span>
+          </button>
+          <p class="analyse-note">Frame-by-frame <code>MediaPipe</code> pose estimation — analysis may take 15–60 s for longer clips</p>
+        </div>
+      </div>
+
+      <!-- ── Right: Result Panel ────────────────────────────────── -->
+      <div class="result-panel" id="result-panel">
+
+        <!-- Empty -->
+        <div class="rp-empty" id="rp-empty">
+          <div class="rp-empty-icon">🎬</div>
+          <div class="rp-empty-title">Waiting for your video…</div>
+          <div class="rp-empty-sub">Upload a clip then click "Analyse Video" to get started.</div>
+        </div>
+
+        <!-- Loading -->
+        <div class="rp-loading" id="rp-loading">
+          <div class="ai-ring-wrap">
+            <div class="ai-ring"></div>
+            <div class="ai-ring-icon">🤖</div>
+          </div>
+          <div style="font-size:1rem;font-weight:700">Processing frames…</div>
+          <div style="font-size:0.82rem;color:var(--text-muted)">Running frame extraction &amp; pose estimation</div>
+        </div>
+
+        <!-- Result -->
+        <div class="rp-result" id="rp-result">
+          <div class="shot-banner">
+            <div class="sb-emoji" id="res-emoji">🏏</div>
+            <div class="sb-info">
+              <div class="sb-label">Detected Shot</div>
+              <div class="sb-name" id="res-name">—</div>
+            </div>
+            <div class="sb-conf" id="res-conf">0%</div>
+          </div>
+
+          <!-- Video meta pills -->
+          <div class="vid-meta-pills" id="vid-meta-pills" style="display:none">
+            <span class="vid-pill" id="pill-frames">— frames</span>
+            <span class="vid-pill" id="pill-processed">— analysed</span>
+          </div>
+
+          <div class="conf-row">
+            <span class="conf-lbl">Confidence Score</span>
+            <span class="conf-val" id="res-conf-val">0%</span>
+          </div>
+          <div class="conf-track"><div class="conf-fill" id="res-conf-fill" style="width:0%"></div></div>
+
+          <div class="shot-desc" id="res-desc"></div>
+
+          <div class="sec-lbl">Top Predictions</div>
+          <div class="top5-list" id="res-top5"></div>
+        </div>
+
+        <!-- Error -->
+        <div class="rp-error" id="rp-error">
+          <div class="rp-error-icon">⚠️</div>
+          <div class="rp-error-msg" id="rp-error-msg">Something went wrong.</div>
+          <button class="btn-retry" id="btn-retry">Try Again</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/script.js"></script>
+  <script>
+    // ── File handling ──────────────────────────────────────────────────
+    let selectedFile = null;
+    const dropZone   = document.getElementById('drop-zone');
+    const fileInput  = document.getElementById('file-input');
+    const dropUI     = document.getElementById('drop-ui');
+    const vidPreview = document.getElementById('vid-preview');
+    const vidPlayer  = document.getElementById('vid-player');
+    const metaBar    = document.getElementById('file-meta-bar');
+    const btnAnalyse = document.getElementById('btn-analyse');
+
+    document.getElementById('btn-choose').addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+    dropZone.addEventListener('click', () => { if (!selectedFile) fileInput.click(); });
+    dropZone.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') fileInput.click(); });
+
+    ['dragenter','dragover'].forEach(ev =>
+      dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag-over'); }));
+    ['dragleave','drop'].forEach(ev =>
+      dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag-over'); }));
+
+    dropZone.addEventListener('drop', e => {
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+    function handleFile(file) {
+      const ALLOWED = ['video/mp4','video/avi','video/quicktime','video/x-matroska','video/x-ms-wmv'];
+      if (!ALLOWED.includes(file.type) && !file.name.match(/\.(mp4|avi|mov|mkv|wmv)$/i)) {
+        showError('Unsupported format. Please upload MP4, AVI, MOV, MKV, or WMV.');
+        return;
+      }
+      if (file.size > 200 * 1024 * 1024) { showError('File too large. Maximum size is 200 MB.'); return; }
+      selectedFile = file;
+      const url = URL.createObjectURL(file);
+      vidPlayer.src = url;
+      dropUI.style.display = 'none';
+      vidPreview.classList.add('visible');
+      metaBar.style.display = 'flex';
+      document.getElementById('meta-name').textContent = file.name;
+      document.getElementById('meta-size').textContent = formatBytes(file.size);
+      btnAnalyse.disabled = false;
+      setState('empty');
+    }
+
+    document.getElementById('btn-vid-clear').addEventListener('click', e => {
+      e.stopPropagation();
+      selectedFile = null;
+      vidPlayer.src = '';
+      vidPreview.classList.remove('visible');
+      dropUI.style.display = '';
+      metaBar.style.display = 'none';
+      btnAnalyse.disabled = true;
+      fileInput.value = '';
+      hideProcBar();
+      setState('empty');
+    });
+
+    // ── Progress bar helpers ───────────────────────────────────────────
+    const procWrap = document.getElementById('process-bar-wrap');
+    const procFill = document.getElementById('process-fill');
+    const procLbl  = document.getElementById('process-lbl-txt');
+    const procPct  = document.getElementById('process-lbl-pct');
+    let   procFake = null;
+
+    function showProcBar(label) {
+      procWrap.classList.add('visible');
+      procLbl.textContent = label;
+      procFill.style.width = '0%'; procPct.textContent = '0%';
+    }
+    function hideProcBar() {
+      procWrap.classList.remove('visible');
+      clearInterval(procFake);
+    }
+    function fakeProcProgress(from, to, durationMs) {
+      clearInterval(procFake);
+      let cur = from;
+      const step = (to - from) / (durationMs / 200);
+      procFake = setInterval(() => {
+        cur = Math.min(cur + step, to);
+        procFill.style.width = `${cur.toFixed(0)}%`;
+        procPct.textContent  = `${cur.toFixed(0)}%`;
+        if (cur >= to) clearInterval(procFake);
+      }, 200);
+    }
+
+    // ── State machine ──────────────────────────────────────────────────
+    function setState(s) {
+      document.getElementById('rp-empty').style.display   = s==='empty'   ? 'flex' : 'none';
+      document.getElementById('rp-loading').style.display = s==='loading' ? 'flex' : 'none';
+      document.getElementById('rp-result').style.display  = s==='result'  ? 'flex' : 'none';
+      document.getElementById('rp-error').style.display   = s==='error'   ? 'flex' : 'none';
+    }
+    function showError(msg) {
+      document.getElementById('rp-error-msg').textContent = msg;
+      setState('error'); hideProcBar();
+    }
+    document.getElementById('btn-retry').addEventListener('click', () => setState('empty'));
+
+    // ── Analyse ────────────────────────────────────────────────────────
+    const SHOT_EMOJIS = {
+      'Cover Drive':'🏏','Defensive':'🛡','Down The Wicket':'🚀','Flick':'✨',
+      'Hook':'🎣','Late Cut':'✂','Lofted Legside':'🌊','Lofted Offside':'☁',
+      'Pull':'💪','Reverse Sweep':'🔄','Scoop':'🥄','Square Cut':'📐',
+      'Straight Drive':'⚡','Sweep':'🧹','Upper Cut':'🔝','drive':'🏏',
+      'legglance-flick':'🦶','pullshot':'🥊'
+    };
+    const SHOT_DESCS = {
+      'Cover Drive':   'A classic off-side drive played to a full-length delivery, with the bat coming down straight through the line.',
+      'Sweep':         'Played on one knee to spinning delivery, sweeping the ball from off to leg side.',
+      'Pull':          'A cross-bat shot played to a short-pitched delivery angling into the body, hitting through the leg side.',
+      'Straight Drive':'The textbook attacking shot — played along the ground, straight back past the bowler.',
+      'Hook':          'An aggressive cross-bat shot played to a very short, high-rising delivery.',
+      'Defensive':     'A defensive block designed to nullify the delivery with no attacking intent.',
+    };
+
+    document.getElementById('btn-analyse').addEventListener('click', async () => {
+      if (!selectedFile) return;
+      setState('loading');
+      document.getElementById('btn-analyse').disabled = true;
+      document.getElementById('btn-spin').style.display = 'inline-block';
+      document.querySelector('#btn-analyse .btn-text').style.display = 'none';
+      showProcBar('Uploading video…');
+      fakeProcProgress(0, 40, 3000);
+
+      const fd = new FormData();
+      fd.append('file', selectedFile);
+
+      try {
+        // Simulate upload progress then analysis progress
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/predict/video', true);
+        xhr.withCredentials = true;
+
+        xhr.upload.onprogress = e => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 40);
+            procFill.style.width = `${pct}%`;
+            procPct.textContent  = `${pct}%`;
+            if (pct >= 40) { procLbl.textContent = 'Analysing frames…'; fakeProcProgress(40, 90, 15000); }
+          }
+        };
+
+        xhr.onload = () => {
+          clearInterval(procFake);
+          procFill.style.width = '100%'; procPct.textContent = '100%';
+          setTimeout(hideProcBar, 600);
+
+          if (xhr.status === 200) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (data.error) {
+                if (data.error === 'free_limit_reached')
+                  showError("You have used all 3 free predictions. Please sign in for unlimited access.");
+                else showError(data.error);
+              } else {
+                renderResult(data);
+              }
+            } catch { showError('Invalid response from server.'); }
+          } else { showError(`Server error (HTTP ${xhr.status}).`); }
+
+          document.getElementById('btn-analyse').disabled = false;
+          document.getElementById('btn-spin').style.display = 'none';
+          document.querySelector('#btn-analyse .btn-text').style.display = '';
+        };
+
+        xhr.onerror = () => {
+          showError('Network error — is the CRICSHOT server running?');
+          document.getElementById('btn-analyse').disabled = false;
+          document.getElementById('btn-spin').style.display = 'none';
+          document.querySelector('#btn-analyse .btn-text').style.display = '';
+        };
+
+        xhr.send(fd);
+      } catch {
+        showError('Failed to start upload. Please try again.');
+        document.getElementById('btn-analyse').disabled = false;
+        document.getElementById('btn-spin').style.display = 'none';
+        document.querySelector('#btn-analyse .btn-text').style.display = '';
+      }
+    });
+
+    function renderResult(data) {
+      const shot = data.shot || 'Unknown';
+      const conf = Math.round((data.confidence || 0) * 100);
+      document.getElementById('res-emoji').textContent = SHOT_EMOJIS[shot] || '🏏';
+      document.getElementById('res-name').textContent  = shot;
+      document.getElementById('res-conf').textContent  = `${conf}%`;
+      document.getElementById('res-conf-val').textContent = `${conf}%`;
+      setTimeout(() => { document.getElementById('res-conf-fill').style.width = `${conf}%`; }, 50);
+      document.getElementById('res-desc').textContent = SHOT_DESCS[shot] || `Shot classified as "${shot}" by analysing multiple video frames.`;
+
+      // Video meta
+      const pillsEl = document.getElementById('vid-meta-pills');
+      if (data.frame_count || data.frames_processed) {
+        pillsEl.style.display = 'flex';
+        if (data.frame_count)      document.getElementById('pill-frames').textContent    = `${data.frame_count} frames`;
+        if (data.frames_processed) document.getElementById('pill-processed').textContent = `${data.frames_processed} analysed`;
+      }
+
+      // Top-5
+      const top5El = document.getElementById('res-top5');
+      top5El.innerHTML = '';
+      const top5 = data.top5 || [[shot, data.confidence || 0]];
+      top5.slice(0,5).forEach(([name, score], i) => {
+        const pct = Math.round(score * 100);
+        top5El.innerHTML += `<div class="top5-row">
+          <span class="t5-rank">${i+1}</span>
+          <div class="t5-bar-w"><div class="t5-bar r${i+1}" style="width:${pct}%"></div></div>
+          <span class="t5-name">${name}</span>
+          <span class="t5-pct">${pct}%</span>
+        </div>`;
+      });
+      setState('result');
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    function formatBytes(b) {
+      if (b < 1024) return `${b} B`;
+      if (b < 1048576) return `${(b/1024).toFixed(1)} KB`;
+      return `${(b/1048576).toFixed(2)} MB`;
+    }
+  </script>
+</body>
+</html>

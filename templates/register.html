@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRICSHOT — Create Account</title>
+  <meta name="description" content="Register for CRICSHOT and get unlimited cricket shot predictions powered by AI." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/auth.css" />
+</head>
+<body>
+
+  <!-- ─── Animated Background ─────────────────────────────────────── -->
+  <canvas id="auth-canvas"></canvas>
+
+  <div class="auth-page-wrapper">
+
+    <!-- Left Panel: Branding -->
+    <div class="auth-brand-panel">
+      <div class="brand-panel-inner">
+        <a href="/" class="auth-logo">
+          <span class="logo-icon">🏏</span>
+          <span class="logo-text">CRICSHOT</span>
+        </a>
+        <h1 class="brand-headline">Join <span class="brand-accent">CRICSHOT</span> for Free</h1>
+        <p class="brand-sub">Create an account in seconds and unlock unlimited cricket shot predictions — powered by a real-time AI pose engine.</p>
+
+        <!-- Feature Checklist -->
+        <ul class="feature-list">
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Unlimited image &amp; video predictions</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Full prediction history &amp; analytics</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Real-time webcam analysis</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Confidence scores &amp; live skeleton overlay</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right Panel: Register Form -->
+    <div class="auth-form-panel">
+      <div class="auth-card wide-card">
+
+        <!-- ── VIEW: Registration Form ──────────────────────────────── -->
+        <div class="auth-view active" id="view-register">
+          <div class="auth-card-header">
+            <h2 class="auth-card-title">Create Account</h2>
+            <p class="auth-card-sub">Fill in the details below to get started</p>
+          </div>
+
+          <!-- Progress Indicator -->
+          <div class="reg-progress">
+            <div class="prog-step active" id="prog-1"><span>1</span><div class="prog-label">Account</div></div>
+            <div class="prog-line"></div>
+            <div class="prog-step" id="prog-2"><span>2</span><div class="prog-label">Verify</div></div>
+            <div class="prog-line"></div>
+            <div class="prog-step" id="prog-3"><span>3</span><div class="prog-label">Done</div></div>
+          </div>
+
+          <form id="form-register" class="auth-form" novalidate>
+
+            <!-- Row: Full Name + Fav Sport -->
+            <div class="field-row">
+              <div class="field-group">
+                <input type="text" id="reg-name" class="field-input" placeholder=" " autocomplete="name" required />
+                <label class="field-label" for="reg-name">Full Name *</label>
+                <span class="field-icon">👤</span>
+              </div>
+              <div class="field-group">
+                <input type="text" id="reg-sport" class="field-input" placeholder=" " />
+                <label class="field-label" for="reg-sport">Favourite Sport</label>
+                <span class="field-icon">🏅</span>
+              </div>
+            </div>
+
+            <!-- Email -->
+            <div class="field-group">
+              <input type="email" id="reg-email" class="field-input" placeholder=" " autocomplete="email" required />
+              <label class="field-label" for="reg-email">Email Address *</label>
+              <span class="field-icon">✉</span>
+            </div>
+
+            <!-- Mobile -->
+            <div class="field-group">
+              <input type="tel" id="reg-mobile" class="field-input" placeholder=" " autocomplete="tel" />
+              <label class="field-label" for="reg-mobile">Mobile Number (optional)</label>
+              <span class="field-icon">📱</span>
+            </div>
+
+            <!-- Password -->
+            <div class="field-group">
+              <input type="password" id="reg-password" class="field-input" placeholder=" " autocomplete="new-password" minlength="6" required />
+              <label class="field-label" for="reg-password">Password (min 6 chars) *</label>
+              <span class="field-icon pw-toggle" id="toggle-reg-pw" title="Show/hide">👁</span>
+            </div>
+
+            <!-- Password strength bar -->
+            <div class="pw-strength-wrap" id="pw-strength-wrap" style="display:none">
+              <div class="pw-strength-bar" id="pw-strength-bar"></div>
+              <span class="pw-strength-label" id="pw-strength-label"></span>
+            </div>
+
+            <!-- Terms -->
+            <label class="checkbox-wrap">
+              <input type="checkbox" id="reg-terms" required />
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">I agree to the <a href="#" class="link-btn">Terms of Service</a> and <a href="#" class="link-btn">Privacy Policy</a></span>
+            </label>
+
+            <div id="reg-error" class="form-error" style="display:none"></div>
+
+            <button type="submit" class="btn-submit" id="btn-register">
+              <span class="btn-label">Create Account →</span>
+              <span class="btn-spinner" style="display:none"></span>
+            </button>
+          </form>
+
+          <div class="auth-switch-text">
+            Already have an account?
+            <button class="link-btn" id="go-login">Sign In</button>
+          </div>
+        </div>
+        <!-- ── END VIEW: Register ────────────────────────────────────── -->
+
+
+        <!-- ── VIEW: OTP Verification ──────────────────────────────── -->
+        <div class="auth-view" id="view-otp">
+          <div class="auth-card-header">
+            <h2 class="auth-card-title">Verify Your Email</h2>
+            <p class="auth-card-sub" id="otp-subtitle-reg">Enter the 6‑digit code we just sent</p>
+          </div>
+
+          <div class="otp-sent-info" id="otp-sent-info"></div>
+
+          <form id="form-otp-reg" class="auth-form" novalidate>
+            <div class="otp-grid">
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="0" autofocus />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="1" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="2" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="3" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="4" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="5" />
+            </div>
+
+            <div id="otp-reg-error" class="form-error" style="display:none"></div>
+
+            <button type="submit" class="btn-submit" id="btn-otp-reg">
+              <span class="btn-label">Verify &amp; Continue ✓</span>
+              <span class="btn-spinner" style="display:none"></span>
+            </button>
+          </form>
+
+          <div class="auth-resend">
+            Didn't receive it?
+            <button class="link-btn" id="btn-resend-reg">Resend code</button>
+            <span id="resend-timer-reg" class="resend-timer"></span>
+          </div>
+        </div>
+        <!-- ── END VIEW: OTP ────────────────────────────────────────── -->
+
+
+        <!-- ── VIEW: Success ──────────────────────────────────────── -->
+        <div class="auth-view" id="view-reg-success">
+          <div class="success-state">
+            <div class="success-icon">✓</div>
+            <h2 class="success-title">Account Created!</h2>
+            <p class="success-sub">Welcome to CRICSHOT. Redirecting…</p>
+            <div class="success-actions">
+              <a href="/" class="btn-submit" style="display:inline-flex;text-decoration:none;width:auto;padding:14px 32px;">
+                Go to App →
+              </a>
+            </div>
+          </div>
+        </div>
+        <!-- ── END VIEW: Success ───────────────────────────────────── -->
+
+      </div><!-- /.auth-card -->
+    </div><!-- /.auth-form-panel -->
+  </div><!-- /.auth-page-wrapper -->
+
+  <script src="/auth.js"></script>
+  <script>
+    // ── State ──────────────────────────────────────────────────────────
+    let _regUserId       = null;
+    let _resendCountdown = null;
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    const show = id => {
+      document.querySelectorAll('.auth-view').forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    };
+    const setError = (id, msg) => {
+      const el = document.getElementById(id);
+      el.textContent = msg; el.style.display = msg ? 'flex' : 'none';
+    };
+    const setLoading = (btn, loading) => {
+      btn.querySelector('.btn-label').style.display  = loading ? 'none'  : '';
+      btn.querySelector('.btn-spinner').style.display = loading ? 'inline-block' : 'none';
+      btn.disabled = loading;
+    };
+    const post = (url, body) =>
+      fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), credentials:'include' });
+
+    const setProg = n => {
+      [1,2,3].forEach(i => {
+        const el = document.getElementById(`prog-${i}`);
+        el.classList.toggle('active', i === n);
+        el.classList.toggle('done', i < n);
+      });
+    };
+
+    // ── Navigation ─────────────────────────────────────────────────────
+    document.getElementById('go-login').onclick = () => location.href = '/login';
+
+    // ── Password Toggle ────────────────────────────────────────────────
+    document.getElementById('toggle-reg-pw').addEventListener('click', () => {
+      const f = document.getElementById('reg-password');
+      f.type = f.type === 'password' ? 'text' : 'password';
+    });
+
+    // ── Password Strength ──────────────────────────────────────────────
+    document.getElementById('reg-password').addEventListener('input', e => {
+      const pw = e.target.value;
+      const wrap = document.getElementById('pw-strength-wrap');
+      const bar  = document.getElementById('pw-strength-bar');
+      const lbl  = document.getElementById('pw-strength-label');
+      if (!pw) { wrap.style.display = 'none'; return; }
+      wrap.style.display = 'flex';
+      let score = 0;
+      if (pw.length >= 6)  score++;
+      if (pw.length >= 10) score++;
+      if (/[A-Z]/.test(pw)) score++;
+      if (/[0-9]/.test(pw)) score++;
+      if (/[^A-Za-z0-9]/.test(pw)) score++;
+      const levels = [
+        { label:'Too short',  color:'#ff4d6d', w:'15%'  },
+        { label:'Weak',       color:'#ff7c1e', w:'30%'  },
+        { label:'Fair',       color:'#fbbf24', w:'55%'  },
+        { label:'Good',       color:'#00b56e', w:'75%'  },
+        { label:'Strong',     color:'#00e88a', w:'100%' },
+      ];
+      const lvl = levels[Math.min(score, 4)];
+      bar.style.width = lvl.w; bar.style.background = lvl.color;
+      lbl.textContent = lvl.label; lbl.style.color = lvl.color;
+    });
+
+    // ── OTP input: auto-advance ────────────────────────────────────────
+    document.querySelectorAll('.otp-box').forEach((box, i, all) => {
+      box.addEventListener('input', e => {
+        if (e.target.value && i < all.length - 1) all[i + 1].focus();
+      });
+      box.addEventListener('keydown', e => {
+        if (e.key === 'Backspace' && !e.target.value && i > 0) all[i - 1].focus();
+      });
+    });
+    const getOtp = () => [...document.querySelectorAll('.otp-box')].map(b => b.value).join('');
+
+    // ── Resend countdown ───────────────────────────────────────────────
+    function startResendTimer() {
+      const timer = document.getElementById('resend-timer-reg');
+      const btn   = document.getElementById('btn-resend-reg');
+      btn.disabled = true; let left = 60;
+      clearInterval(_resendCountdown);
+      _resendCountdown = setInterval(() => {
+        timer.textContent = `(${left}s)`;
+        if (--left < 0) { clearInterval(_resendCountdown); timer.textContent = ''; btn.disabled = false; }
+      }, 1000);
+    }
+
+    // ── REGISTRATION ───────────────────────────────────────────────────
+    document.getElementById('form-register').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn  = document.getElementById('btn-register');
+      const name = document.getElementById('reg-name').value.trim();
+      const email= document.getElementById('reg-email').value.trim();
+
+      if (!document.getElementById('reg-terms').checked) {
+        setError('reg-error', 'Please agree to the Terms of Service'); return;
+      }
+      setError('reg-error', '');
+      setLoading(btn, true);
+
+      try {
+        const res  = await post('/auth/signup', {
+          name,
+          email,
+          mobile:    document.getElementById('reg-mobile').value.trim() || null,
+          fav_sport: document.getElementById('reg-sport').value.trim()  || null,
+          password:  document.getElementById('reg-password').value,
+        });
+        const data = await res.json();
+        if (data.user_id) {
+          _regUserId = data.user_id;
+          document.getElementById('otp-sent-info').textContent = `Code sent to ${email}`;
+          setProg(2);
+          show('view-otp');
+          startResendTimer();
+        } else {
+          setError('reg-error', data.error || 'Registration failed');
+        }
+      } catch { setError('reg-error', 'Network error. Please try again.'); }
+      setLoading(btn, false);
+    });
+
+    // ── OTP VERIFY ─────────────────────────────────────────────────────
+    document.getElementById('form-otp-reg').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-otp-reg');
+      const otp = getOtp();
+      if (otp.length < 6) { setError('otp-reg-error', 'Please enter the full 6-digit code'); return; }
+      setError('otp-reg-error', '');
+      setLoading(btn, true);
+      try {
+        const res  = await post('/auth/verify', { user_id: _regUserId, otp });
+        const data = await res.json();
+        if (data.message === 'Login successful') {
+          setProg(3);
+          show('view-reg-success');
+          setTimeout(() => location.href = '/', 3000);
+        } else {
+          setError('otp-reg-error', data.error || 'Invalid OTP');
+        }
+      } catch { setError('otp-reg-error', 'Network error.'); }
+      setLoading(btn, false);
+    });
+
+    // ── RESEND ─────────────────────────────────────────────────────────
+    document.getElementById('btn-resend-reg').addEventListener('click', async () => {
+      if (!_regUserId) return;
+      await post('/auth/resend-otp', { user_id: _regUserId });
+      startResendTimer();
+    });
+  </script>
+</body>
+</html>

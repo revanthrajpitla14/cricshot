@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRICSHOT — Sign In</title>
+  <meta name="description" content="Sign in to your CRICSHOT account to access unlimited cricket shot predictions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/auth.css" />
+</head>
+<body>
+
+  <!-- ─── Animated Background ─────────────────────────────────────── -->
+  <canvas id="auth-canvas"></canvas>
+
+  <!-- ─── Login Card ───────────────────────────────────────────────── -->
+  <div class="auth-page-wrapper">
+
+    <!-- Left Panel: Branding -->
+    <div class="auth-brand-panel">
+      <div class="brand-panel-inner">
+        <a href="/" class="auth-logo">
+          <span class="logo-icon">🏏</span>
+          <span class="logo-text">CRICSHOT</span>
+        </a>
+        <h1 class="brand-headline">Identify Any Cricket Shot <span class="brand-accent">Instantly</span></h1>
+        <p class="brand-sub">Upload a photo or video and our AI powered by MediaPipe + OpenCV classifies the batting shot from <strong>18 shot types</strong> in seconds.</p>
+        <div class="brand-stats">
+          <div class="brand-stat"><span class="bs-num">18</span><span class="bs-lbl">Shot Types</span></div>
+          <div class="brand-divider"></div>
+          <div class="brand-stat"><span class="bs-num">AI</span><span class="bs-lbl">Powered</span></div>
+          <div class="brand-divider"></div>
+          <div class="brand-stat"><span class="bs-num">3</span><span class="bs-lbl">Free Tries</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Forms -->
+    <div class="auth-form-panel">
+      <div class="auth-card">
+
+        <!-- ── VIEW: Login ─────────────────────────────────────────── -->
+        <div class="auth-view active" id="view-login">
+          <div class="auth-card-header">
+            <h2 class="auth-card-title">Welcome back</h2>
+            <p class="auth-card-sub">Sign in to your CRICSHOT account</p>
+          </div>
+
+          <form id="form-login" class="auth-form" novalidate>
+            <div class="field-group">
+              <input type="email" id="login-email" class="field-input" placeholder=" " autocomplete="email" required />
+              <label class="field-label" for="login-email">Email Address</label>
+              <span class="field-icon">✉</span>
+            </div>
+            <div class="field-group">
+              <input type="password" id="login-password" class="field-input" placeholder=" " autocomplete="current-password" required />
+              <label class="field-label" for="login-password">Password</label>
+              <span class="field-icon pw-toggle" id="toggle-login-pw" title="Show/hide password">👁</span>
+            </div>
+
+            <div class="form-row-btw">
+              <label class="checkbox-wrap">
+                <input type="checkbox" id="remember-me" />
+                <span class="checkbox-custom"></span>
+                <span class="checkbox-text">Remember me</span>
+              </label>
+              <button type="button" class="link-btn" id="go-forgot">Forgot password?</button>
+            </div>
+
+            <div id="login-error" class="form-error" style="display:none"></div>
+
+            <button type="submit" class="btn-submit" id="btn-login">
+              <span class="btn-label">Sign In</span>
+              <span class="btn-spinner" style="display:none"></span>
+            </button>
+          </form>
+
+          <div class="auth-divider"><span>or</span></div>
+
+          <div class="auth-switch-text">
+            Don't have an account?
+            <button class="link-btn" id="go-signup">Create account</button>
+          </div>
+        </div>
+        <!-- ── END VIEW: Login ──────────────────────────────────────── -->
+
+
+        <!-- ── VIEW: Forgot Password ──────────────────────────────── -->
+        <div class="auth-view" id="view-forgot">
+          <div class="auth-card-header">
+            <h2 class="auth-card-title">Account Recovery</h2>
+            <p class="auth-card-sub">Enter your email and we'll send an OTP</p>
+          </div>
+
+          <form id="form-forgot" class="auth-form" novalidate>
+            <div class="field-group">
+              <input type="email" id="forgot-email" class="field-input" placeholder=" " autocomplete="email" required />
+              <label class="field-label" for="forgot-email">Email Address</label>
+              <span class="field-icon">✉</span>
+            </div>
+
+            <div id="forgot-error" class="form-error" style="display:none"></div>
+
+            <button type="submit" class="btn-submit" id="btn-forgot">
+              <span class="btn-label">Send OTP →</span>
+              <span class="btn-spinner" style="display:none"></span>
+            </button>
+          </form>
+
+          <div class="auth-switch-text">
+            <button class="link-btn" id="go-login-from-forgot">← Back to Sign In</button>
+          </div>
+        </div>
+        <!-- ── END VIEW: Forgot ────────────────────────────────────── -->
+
+
+        <!-- ── VIEW: OTP Verification ──────────────────────────────── -->
+        <div class="auth-view" id="view-otp">
+          <div class="auth-card-header">
+            <h2 class="auth-card-title">Verify OTP</h2>
+            <p class="auth-card-sub" id="otp-subtitle">Enter the 6-digit code sent to your email</p>
+          </div>
+
+          <form id="form-otp" class="auth-form" novalidate>
+            <div class="otp-grid">
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="0" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="1" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="2" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="3" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="4" />
+              <input class="otp-box" type="text" maxlength="1" inputmode="numeric" data-idx="5" />
+            </div>
+
+            <div id="otp-error" class="form-error" style="display:none"></div>
+
+            <button type="submit" class="btn-submit" id="btn-otp">
+              <span class="btn-label">Verify ✓</span>
+              <span class="btn-spinner" style="display:none"></span>
+            </button>
+          </form>
+
+          <div class="auth-resend">
+            Didn't receive it?
+            <button class="link-btn" id="btn-resend">Resend code</button>
+            <span id="resend-timer" class="resend-timer"></span>
+          </div>
+        </div>
+        <!-- ── END VIEW: OTP ────────────────────────────────────────── -->
+
+
+        <!-- ── VIEW: Reset Password ────────────────────────────────── -->
+        <div class="auth-view" id="view-reset">
+          <div class="auth-card-header">
+            <h2 class="auth-card-title">Set New Password</h2>
+            <p class="auth-card-sub">OTP verified! Create a strong new password.</p>
+          </div>
+
+          <form id="form-reset" class="auth-form" novalidate>
+            <div class="field-group">
+              <input type="password" id="reset-pw" class="field-input" placeholder=" " minlength="6" required />
+              <label class="field-label" for="reset-pw">New Password</label>
+              <span class="field-icon pw-toggle" id="toggle-reset-pw" title="Show/hide">👁</span>
+            </div>
+            <div class="field-group">
+              <input type="password" id="reset-pw-confirm" class="field-input" placeholder=" " minlength="6" required />
+              <label class="field-label" for="reset-pw-confirm">Confirm Password</label>
+              <span class="field-icon">🔒</span>
+            </div>
+
+            <div id="reset-error" class="form-error" style="display:none"></div>
+
+            <button type="submit" class="btn-submit" id="btn-reset">
+              <span class="btn-label">Reset Password →</span>
+              <span class="btn-spinner" style="display:none"></span>
+            </button>
+          </form>
+        </div>
+        <!-- ── END VIEW: Reset ─────────────────────────────────────── -->
+
+
+        <!-- ── SUCCESS STATE ──────────────────────────────────────── -->
+        <div class="auth-view" id="view-success">
+          <div class="success-state">
+            <div class="success-icon">✓</div>
+            <h2 class="success-title">You're in!</h2>
+            <p class="success-sub">Redirecting to CRICSHOT…</p>
+          </div>
+        </div>
+
+      </div><!-- /.auth-card -->
+    </div><!-- /.auth-form-panel -->
+  </div><!-- /.auth-page-wrapper -->
+
+  <script src="/auth.js"></script>
+  <script>
+    // ── State ──────────────────────────────────────────────────────────
+    let _pendingUserId  = null;   // set after OTP is triggered
+    let _otpMode        = null;   // 'login' | 'reset'
+    let _resendCountdown = null;
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    const show = id => {
+      document.querySelectorAll('.auth-view').forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    };
+    const setError = (id, msg) => {
+      const el = document.getElementById(id);
+      el.textContent = msg; el.style.display = msg ? 'flex' : 'none';
+    };
+    const setLoading = (btn, loading) => {
+      btn.querySelector('.btn-label').style.display  = loading ? 'none'   : '';
+      btn.querySelector('.btn-spinner').style.display = loading ? 'inline-block' : 'none';
+      btn.disabled = loading;
+    };
+    const post = (url, body) =>
+      fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), credentials:'include' });
+
+    // ── Navigation buttons ─────────────────────────────────────────────
+    document.getElementById('go-signup').onclick    = () => location.href = '/register';
+    document.getElementById('go-forgot').onclick    = () => show('view-forgot');
+    document.getElementById('go-login-from-forgot').onclick = () => show('view-login');
+
+    // ── Password toggle ────────────────────────────────────────────────
+    document.getElementById('toggle-login-pw').addEventListener('click', () => {
+      const f = document.getElementById('login-password');
+      f.type = f.type === 'password' ? 'text' : 'password';
+    });
+    document.getElementById('toggle-reset-pw').addEventListener('click', () => {
+      const f = document.getElementById('reset-pw');
+      f.type = f.type === 'password' ? 'text' : 'password';
+    });
+
+    // ── OTP input: auto-advance focus ─────────────────────────────────
+    document.querySelectorAll('.otp-box').forEach((box, i, all) => {
+      box.addEventListener('input', e => {
+        if (e.target.value && i < all.length - 1) all[i + 1].focus();
+      });
+      box.addEventListener('keydown', e => {
+        if (e.key === 'Backspace' && !e.target.value && i > 0) all[i - 1].focus();
+      });
+    });
+
+    function getOtpValue() {
+      return [...document.querySelectorAll('.otp-box')].map(b => b.value).join('');
+    }
+
+    // ── Resend countdown ───────────────────────────────────────────────
+    function startResendTimer(secs = 60) {
+      const timer = document.getElementById('resend-timer');
+      const btn   = document.getElementById('btn-resend');
+      btn.disabled = true;
+      let left = secs;
+      clearInterval(_resendCountdown);
+      _resendCountdown = setInterval(() => {
+        timer.textContent = `(${left}s)`;
+        if (--left < 0) {
+          clearInterval(_resendCountdown);
+          timer.textContent = '';
+          btn.disabled = false;
+        }
+      }, 1000);
+    }
+
+    // ── LOGIN ──────────────────────────────────────────────────────────
+    document.getElementById('form-login').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-login');
+      setError('login-error', '');
+      setLoading(btn, true);
+      try {
+        const res  = await post('/auth/login', {
+          email:    document.getElementById('login-email').value.trim(),
+          password: document.getElementById('login-password').value
+        });
+        const data = await res.json();
+        if (data.type === 'otp_required') {
+          _pendingUserId = data.user_id;
+          _otpMode = 'login';
+          document.getElementById('otp-subtitle').textContent = 'Enter the 6‑digit code sent to your email';
+          show('view-otp');
+          startResendTimer();
+        } else if (data.error) {
+          setError('login-error', data.error);
+        }
+      } catch { setError('login-error', 'Network error. Please try again.'); }
+      setLoading(btn, false);
+    });
+
+    // ── FORGOT PASSWORD ────────────────────────────────────────────────
+    document.getElementById('form-forgot').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-forgot');
+      setError('forgot-error', '');
+      setLoading(btn, true);
+      try {
+        const res  = await post('/auth/forgot-password', {
+          email: document.getElementById('forgot-email').value.trim()
+        });
+        const data = await res.json();
+        if (data.user_id) {
+          _pendingUserId = data.user_id;
+          _otpMode = 'reset';
+          document.getElementById('otp-subtitle').textContent = 'Enter the 6‑digit code to reset your password';
+          show('view-otp');
+          startResendTimer();
+        } else {
+          setError('forgot-error', data.error || 'User not found');
+        }
+      } catch { setError('forgot-error', 'Network error. Please try again.'); }
+      setLoading(btn, false);
+    });
+
+    // ── OTP VERIFICATION ───────────────────────────────────────────────
+    document.getElementById('form-otp').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-otp');
+      const otp = getOtpValue();
+      if (otp.length < 6) { setError('otp-error', 'Please enter the full 6-digit code'); return; }
+      setError('otp-error', '');
+      setLoading(btn, true);
+
+      if (_otpMode === 'login') {
+        try {
+          const res  = await post('/auth/verify', { user_id: _pendingUserId, otp });
+          const data = await res.json();
+          if (data.message === 'Login successful') {
+            show('view-success');
+            setTimeout(() => location.href = '/', 1800);
+          } else {
+            setError('otp-error', data.error || 'Invalid OTP');
+          }
+        } catch { setError('otp-error', 'Network error.'); }
+      } else if (_otpMode === 'reset') {
+        // For password reset: verify OTP then show reset form
+        try {
+          // We re-use the same OTP box but move to reset view — store otp on state
+          window._resetOtp = otp;
+          show('view-reset');
+        } catch { setError('otp-error', 'Something went wrong.'); }
+      }
+      setLoading(btn, false);
+    });
+
+    // ── RESEND OTP ─────────────────────────────────────────────────────
+    document.getElementById('btn-resend').addEventListener('click', async () => {
+      if (!_pendingUserId) return;
+      await post('/auth/resend-otp', { user_id: _pendingUserId });
+      startResendTimer();
+    });
+
+    // ── RESET PASSWORD ─────────────────────────────────────────────────
+    document.getElementById('form-reset').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-reset');
+      const pw  = document.getElementById('reset-pw').value;
+      const pw2 = document.getElementById('reset-pw-confirm').value;
+      if (pw !== pw2) { setError('reset-error', 'Passwords do not match'); return; }
+      if (pw.length < 6) { setError('reset-error', 'Minimum 6 characters required'); return; }
+      setError('reset-error', '');
+      setLoading(btn, true);
+      try {
+        const res  = await post('/auth/reset-password', {
+          user_id:  _pendingUserId,
+          otp:      window._resetOtp,
+          password: pw
+        });
+        const data = await res.json();
+        if (data.message) {
+          show('view-success');
+          setTimeout(() => location.href = '/', 2000);
+        } else {
+          setError('reset-error', data.error || 'Reset failed');
+        }
+      } catch { setError('reset-error', 'Network error.'); }
+      setLoading(btn, false);
+    });
+  </script>
+</body>
+</html>
