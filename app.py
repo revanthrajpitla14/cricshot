@@ -350,63 +350,28 @@ def seed_shot_types():
     db.session.commit()
 
 
-# ── Deferred DB initialisation ────────────────────────────────────────────────
-# We do NOT call db.create_all() / seed_shot_types() synchronously at boot.
-# Instead:
-#   • Gunicorn/Render: run `flask seed-db` as a pre-deploy command, OR
-#   • Development : the first incoming request triggers _init_db() below.
-
-_db_initialised = False
-
-def _init_db():
-    """Create tables and seed shot types. Safe to call multiple times."""
-    global _db_initialised
-    
-    from flask import has_request_context, request
-    if has_request_context() and request.path == '/health':
-        return
-
-    if _db_initialised:
-        return
-
-    try:
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        
-        # Check if the "users" table exists before creating tables or seeding.
-        # This prevents the Turso SQL Input Error: table users already exists
-        if not inspector.has_table("users"):
-            db.create_all()
-            seed_shot_types()
-            print("[DB] Tables created and shot types seeded successfully.", flush=True)
-        else:
-            print("[DB] Tables already exist, skipping creation.", flush=True)
-            
-    except Exception as _e:
-        print(f"[DB INIT ERROR] {_e}", flush=True)
-        import traceback, sys
-        traceback.print_exc(file=sys.stdout)
-        sys.stdout.flush()
-    finally:
-        # Make sure _db_initialised = True is set at the end of the block 
-        # so it never checks the database again for the lifespan of that worker,
-        # even if an error occurred temporarily.
-        _db_initialised = True
-
-
-@app.before_request
-def _lazy_db_init():
-    """Initialise the DB on the very first request (skipped for /health)."""
-    if request.path == '/health':
-        return  # never block the health check
-    _init_db()
-
+# ── DB Initialisation commands ────────────────────────────────────────────────
+# Use `flask seed-db` to create tables and seed shot types.
+# The web server will NEVER attempt to create tables during a request.
 
 @app.cli.command("seed-db")
 def seed_db_command():
     """Flask CLI: create tables and seed shot types (run once per deploy)."""
     with app.app_context():
-        _init_db()
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            if not inspector.has_table("users"):
+                db.create_all()
+                seed_shot_types()
+                print("[DB] Tables created and shot types seeded successfully.", flush=True)
+            else:
+                print("[DB] Tables already exist, skipping creation.", flush=True)
+        except Exception as _e:
+            print(f"[DB INIT ERROR] {_e}", flush=True)
+            import traceback, sys
+            traceback.print_exc(file=sys.stdout)
+            sys.stdout.flush()
     print("[seed-db] Done.", flush=True)
 
 
@@ -573,7 +538,13 @@ def send_otp(user, otp):
 
 @app.route('/health')
 def health_check():
-    return "OK", 200
+    from sqlalchemy import text
+    try:
+        db.session.execute(text('SELECT 1'))
+        return jsonify({"server": "online", "db": "online"}), 200
+    except Exception as e:
+        print(f"[HEALTH CHECK ERROR] DB connection failed: {e}", flush=True)
+        return jsonify({"server": "online", "db": "error"}), 200
 
 
 # ═══════════════════════════════════════════════════════════════════════
