@@ -13,6 +13,9 @@ import pickle
 import numpy as np
 import cv2
 from PIL import Image
+import threading
+
+_inference_lock = threading.Lock()
 
 try:
     import mediapipe as mp
@@ -132,7 +135,7 @@ def _gif_to_base64(frames_rgb: list) -> str:
         append_images=pil_frames[1:],
         loop=0,
         duration=80,
-        optimize=True
+        optimize=False
     )
     return "data:image/gif;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
 
@@ -140,17 +143,18 @@ def _gif_to_base64(frames_rgb: list) -> str:
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def predict_image(file_bytes: bytes) -> dict:
-    clf, le = _load_model()
-    landmarker = _get_image_landmarker()
+    with _inference_lock:
+        clf, le = _load_model()
+        landmarker = _get_image_landmarker()
 
     np_arr = np.frombuffer(file_bytes, np.uint8)
     img    = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     if img is None:
         return {"error": "Cannot decode image."}
 
-    # Resize for display
+    # Resize for massive CPU speedups
     h, w  = img.shape[:2]
-    scale = min(640 / w, 640 / h, 1.0)
+    scale = min(480 / w, 480 / h, 1.0)
     if scale < 1.0:
         img = cv2.resize(img, (int(w * scale), int(h * scale)))
 
@@ -186,8 +190,9 @@ def predict_image(file_bytes: bytes) -> dict:
 
 
 def predict_video(file_bytes: bytes) -> dict:
-    clf, le = _load_model()
-    landmarker = _get_video_landmarker()
+    with _inference_lock:
+        clf, le = _load_model()
+        landmarker = _get_video_landmarker()
 
     import tempfile
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
@@ -209,11 +214,15 @@ def predict_video(file_bytes: bytes) -> dict:
         frame_idx = 0
 
         while True:
-            ret, frame = cap.read()
-            if not ret:
+            # hardware grab to bypass decoding skipped frames
+            grabbed = cap.grab()
+            if not grabbed:
                 break
 
             if frame_idx % step == 0:
+                ret, frame = cap.retrieve()
+                if not ret: break
+
                 h, w  = frame.shape[:2]
                 frame_sm = cv2.resize(frame, (min(w, 480), min(h, 270)))
                 h, w     = frame_sm.shape[:2]
