@@ -11,7 +11,7 @@ venv/
 
 # Database (SQLite - ephemeral on Render, don't commit)
 instance/
-# *.db and data/ are now tracked — removed exclusions
+data/
 
 # Temp files
 /tmp/
