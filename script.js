@@ -879,10 +879,10 @@ loadStats();
   const maxAttempts = 20; // 60 seconds total
 
   function ping() {
-    fetch("/health")
+    fetch("/system/state")
       .then(r => r.json())
       .then(d => {
-        if (d.status === "ok") {
+        if (d.db === "online" || d.db === "offline") {
           banner.style.display = "none";
         } else {
           retry();
