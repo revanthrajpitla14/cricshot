@@ -56,46 +56,63 @@ _landmarker_video       = None
 
 def _load_model():
     global _clf, _le
-    if _clf is None:
-        clf_path = os.path.join(MODEL_DIR, "shot_classifier.pkl")
-        le_path  = os.path.join(MODEL_DIR, "label_encoder.pkl")
-        if not os.path.exists(clf_path) or not os.path.exists(le_path):
-            raise FileNotFoundError(
-                "Model files not found. Please run train_model.py first."
-            )
-        with open(clf_path, "rb") as f:
-            _clf = pickle.load(f)
-        with open(le_path, "rb") as f:
-            _le = pickle.load(f)
+    with _inference_lock:
+        if _clf is None:
+            clf_path = os.path.join(MODEL_DIR, "shot_classifier.pkl")
+            le_path  = os.path.join(MODEL_DIR, "label_encoder.pkl")
+            if not os.path.exists(clf_path) or not os.path.exists(le_path):
+                raise FileNotFoundError(
+                    "Model files not found. Please run train_model.py first."
+                )
+            with open(clf_path, "rb") as f:
+                _clf = pickle.load(f)
+            with open(le_path, "rb") as f:
+                _le = pickle.load(f)
     return _clf, _le
 
 
 def _get_image_landmarker():
-    global _landmarker_image
-    if _landmarker_image is None:
-        opts = PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=TASK_MODEL_PATH),
-            running_mode=mp_vision.RunningMode.IMAGE,
-            min_pose_detection_confidence=0.3,
-            min_pose_presence_confidence=0.3,
-            num_poses=1
-        )
-        _landmarker_image = PoseLandmarker.create_from_options(opts)
+    global _landmarker_image, _landmarker_video
+    with _inference_lock:
+        if _landmarker_video is not None:
+            try:
+                _landmarker_video.close()
+            except Exception:
+                pass
+            _landmarker_video = None
+            
+        if _landmarker_image is None:
+            opts = PoseLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=TASK_MODEL_PATH),
+                running_mode=mp_vision.RunningMode.IMAGE,
+                min_pose_detection_confidence=0.3,
+                min_pose_presence_confidence=0.3,
+                num_poses=1
+            )
+            _landmarker_image = PoseLandmarker.create_from_options(opts)
     return _landmarker_image
 
 
 def _get_video_landmarker():
-    global _landmarker_video
-    if _landmarker_video is None:
-        opts = PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=TASK_MODEL_PATH),
-            running_mode=mp_vision.RunningMode.VIDEO,
-            min_pose_detection_confidence=0.3,
-            min_pose_presence_confidence=0.3,
-            min_tracking_confidence=0.3,
-            num_poses=1
-        )
-        _landmarker_video = PoseLandmarker.create_from_options(opts)
+    global _landmarker_image, _landmarker_video
+    with _inference_lock:
+        if _landmarker_image is not None:
+            try:
+                _landmarker_image.close()
+            except Exception:
+                pass
+            _landmarker_image = None
+            
+        if _landmarker_video is None:
+            opts = PoseLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=TASK_MODEL_PATH),
+                running_mode=mp_vision.RunningMode.VIDEO,
+                min_pose_detection_confidence=0.3,
+                min_pose_presence_confidence=0.3,
+                min_tracking_confidence=0.3,
+                num_poses=1
+            )
+            _landmarker_video = PoseLandmarker.create_from_options(opts)
     return _landmarker_video
 
 
