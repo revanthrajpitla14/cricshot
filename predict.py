@@ -265,7 +265,7 @@ def predict_video(file_bytes: bytes) -> dict:
             "all_scores": all_scores,
             "frame_count": frame_idx,
             "frames_processed": len(all_proba),
-            "annotated_gif": _gif_to_base64(gif_frames[:30])
+            "annotated_image": _gif_to_base64(gif_frames[:30])
         }
 
     except Exception as e:

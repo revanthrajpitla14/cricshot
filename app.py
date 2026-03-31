@@ -110,8 +110,9 @@ def run_inference(job_id, file_bytes, mode="image"):
 
         # Log to DB directly in this ephemeral thread
         try:
-            from services import log_prediction
-            log_prediction(result, mode, session_token=session_tok, manual_user_id=user_uid)
+            with app.app_context():
+                from services import log_prediction
+                log_prediction(result, mode, session_token=session_tok, manual_user_id=user_uid)
         except Exception as e:
             # Trip the DB spillover logic
             spill_data = {
@@ -158,12 +159,13 @@ def db_flusher_loop():
             
             for item in items:
                 try:
-                    log_prediction(
-                        item.get("result", {}), 
-                        item.get("file_type", "image"), 
-                        session_token=item.get("session_token"),
-                        manual_user_id=item.get("user_id")
-                    )
+                    with app.app_context():
+                        log_prediction(
+                            item.get("result", {}), 
+                            item.get("file_type", "image"), 
+                            session_token=item.get("session_token"),
+                            manual_user_id=item.get("user_id")
+                        )
                 except Exception as e:
                     # Append it back
                     FAILED_DB_WRITES.append(item)
