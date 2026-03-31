@@ -11,7 +11,13 @@ import io
 import base64
 import pickle
 import numpy as np
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 import cv2
+cv2.setNumThreads(1)
 from PIL import Image
 import threading
 
@@ -153,9 +159,9 @@ def predict_image(file_bytes: bytes) -> dict:
 
     # Resize for massive CPU speedups
     h, w  = img.shape[:2]
-    scale = min(480 / w, 480 / h, 1.0)
+    scale = min(256 / w, 256 / h, 1.0)
     if scale < 1.0:
-        img = cv2.resize(img, (int(w * scale), int(h * scale)))
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
     h, w  = img.shape[:2]
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -207,7 +213,7 @@ def predict_video(file_bytes: bytes) -> dict:
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps          = cap.get(cv2.CAP_PROP_FPS) or 25
-        MAX_FRAMES   = 60
+        MAX_FRAMES   = 15
         step         = max(1, total_frames // MAX_FRAMES)
 
         all_proba, gif_frames = [], []
@@ -224,7 +230,12 @@ def predict_video(file_bytes: bytes) -> dict:
                 if not ret: break
 
                 h, w  = frame.shape[:2]
-                frame_sm = cv2.resize(frame, (min(w, 480), min(h, 270)))
+                scale = min(256 / w, 256 / h, 1.0)
+                if scale < 1.0:
+                    frame_sm = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+                else:
+                    frame_sm = frame
+                    
                 h, w     = frame_sm.shape[:2]
 
                 img_rgb = cv2.cvtColor(frame_sm, cv2.COLOR_BGR2RGB)
@@ -298,9 +309,9 @@ def predict_frame(base64_str: str) -> dict:
         return {"error": "Cannot decode frame."}
 
     h, w = img.shape[:2]
-    scale = min(320 / w, 320 / h, 1.0)
+    scale = min(256 / w, 256 / h, 1.0)
     if scale < 1.0:
-        img = cv2.resize(img, (int(w * scale), int(h * scale)))
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
     h, w = img.shape[:2]
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
