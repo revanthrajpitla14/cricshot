@@ -875,10 +875,6 @@ def resend_otp():
 #  PREDICTION ROUTES
 # ═══════════════════════════════════════════════════════════════════════
 
-@app.route("/")
-def index():
-    return send_from_directory(BASE_DIR, "index.html")
-
 
 # ── Auth page routes (serve Jinja templates) ──────────────────────────
 @app.route("/login")
@@ -1086,7 +1082,7 @@ def stats():
     })
 
 
-@app.route("/shots")
+@app.route("/api/shots")
 def shot_types():
     """Return reference table of all 18 recognised cricket shot types."""
     shots = ShotType.query.order_by(ShotType.name).all()
