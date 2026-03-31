@@ -89,7 +89,7 @@ def warmup_model():
 
 threading.Thread(target=warmup_model, daemon=True).start()
 
-def run_inference(job_id, file_bytes, mode="image"):
+def run_inference(job_id, file_bytes, mode="image", session_tok=None, user_uid=None):
     try:
         if mode == "image":
             from predict import predict_image
