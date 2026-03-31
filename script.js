@@ -844,23 +844,15 @@ async function pollJobStatus(jobId) {
 
 // ─── Initial State ──────────────────────────────────────────────────────────
 async function checkSystemHealth() {
-  const dbText = document.getElementById("db-status-text");
-  const dbDot  = document.getElementById("db-status-dot");
-  
   try {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await fetch("/system/state");
     const data = await res.json();
-    
-    if (data.database === "connected") {
-      dbText.textContent = data.using_turso ? "Turso Live" : "Local SQLite";
-      dbDot.className = "status-dot" + (data.using_turso ? "" : " local");
-    } else {
-      dbText.textContent = "Offline";
-      dbDot.className = "status-dot offline";
+
+    if (data.db === "offline") {
+      console.warn("DB temporarily unavailable: Circuit Breaker active");
     }
-  } catch (err) {
-    dbText.textContent = "Error";
-    dbDot.className = "status-dot offline";
+  } catch (e) {
+    console.warn("Health check failed silently: Route unroutable");
   }
 }
 
@@ -1222,29 +1214,6 @@ otpInputs.forEach((input, idx) => {
     }
   });
 });
-
-// ─── Development Helpers ────────────────────────────────────────────
-function showOtpToast(otp) {
-  // Remove existing toasts first
-  const existing = document.querySelectorAll(".otp-toast");
-  existing.forEach(t => t.remove());
-
-  const toast = document.createElement("div");
-  toast.className = "otp-toast";
-  toast.innerHTML = `
-    <div class="otp-toast-title">Instant OTP (Development)</div>
-    <div class="otp-toast-code">${otp}</div>
-    <div class="otp-toast-hint">Sent via email if configured. Click to dismiss.</div>
-  `;
-
-  toast.addEventListener("click", () => toast.remove());
-  document.body.appendChild(toast);
-
-  // Auto-remove after 30 seconds
-  setTimeout(() => {
-    if (toast.parentElement) toast.remove();
-  }, 30000);
-}
 
 // ─── Success Toast ───────────────────────────────────────────────────
 function showSuccessToast(msg) {

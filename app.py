@@ -993,6 +993,15 @@ def api_predict_image():
         return jsonify({"error": f"Server crash during submission: {str(e)}"}), 500
 
 
+@app.route("/system/state")
+def system_state():
+    import time
+    import turso_db
+
+    if time.time() < turso_db.DB_DOWN_UNTIL:
+        return {"db": "offline"}
+    return {"db": "online"}
+
 @app.route("/predict/video", methods=["POST"])
 def api_predict_video():
     try:
