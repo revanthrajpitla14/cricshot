@@ -798,47 +798,78 @@ btnPredict.addEventListener("click", async () => {
   }
 });
 
+// Track poll retries per job to handle transient failures gracefully
+const _pollRetries = {};
+
 async function pollJobStatus(jobId) {
+  if (!_pollRetries[jobId]) _pollRetries[jobId] = 0;
+
   try {
     const response = await fetch(`${API_BASE}/predict/status/${jobId}`);
-    if (!response.ok) {
-        showError("Failed to fetch job status.");
-        hideLoading();
-        return;
-    }
-    const data = await response.json();
-    
-    if (data.status === "queued") {
-        updateLoadingText("Queued...");
-        setTimeout(() => pollJobStatus(jobId), 1500);
-    } else if (data.status === "processing") {
-        updateLoadingText("Analysing...");
-        setTimeout(() => pollJobStatus(jobId), 1500);
-    } else if (data.status === "error") {
-        showError(data.result?.error || "Inference failed.");
-        hideLoading();
-    } else if (data.status === "done") {
-        const result = data.result;
-        renderResult(result, currentMode === "video");
-        
-        if (result.error && !result.annotated_image) {
-            document.getElementById("no-skeleton-result").style.display = "block";
-            document.getElementById("annotated-image-result").style.display = "none";
-        }
 
-        // Increment free predictions counter (client-side fallback)
-        if (!currentAuthUser) {
-            let freePredictions = parseInt(localStorage.getItem("free_predictions") || "0", 10);
-            localStorage.setItem("free_predictions", freePredictions + 1);
-        }
+    if (!response.ok) {
+      // Transient server issue: retry up to 5 times before giving up
+      _pollRetries[jobId]++;
+      if (_pollRetries[jobId] <= 5) {
+        updateLoadingText("Retrying…");
+        setTimeout(() => pollJobStatus(jobId), 2000);
+      } else {
+        showError("Server is busy. Please try uploading again.");
         hideLoading();
+        delete _pollRetries[jobId];
+      }
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data.status === "not_found") {
+      // Job evicted from memory (server cold-start restart). Inform user clearly.
+      showError("The server restarted while processing. Please try again — this is rare on the free tier.");
+      hideLoading();
+      delete _pollRetries[jobId];
+    } else if (data.status === "queued") {
+      updateLoadingText("Queued…");
+      setTimeout(() => pollJobStatus(jobId), 1500);
+    } else if (data.status === "processing") {
+      updateLoadingText("Analysing…");
+      setTimeout(() => pollJobStatus(jobId), 1500);
+    } else if (data.status === "error") {
+      showError(data.result?.error || "Inference failed. Check that the image clearly shows a cricket shot.");
+      hideLoading();
+      delete _pollRetries[jobId];
+    } else if (data.status === "done") {
+      const result = data.result;
+      renderResult(result, currentMode === "video");
+
+      if (result.error && !result.annotated_image) {
+        document.getElementById("no-skeleton-result").style.display = "block";
+        document.getElementById("annotated-image-result").style.display = "none";
+      }
+
+      // Increment free predictions counter (client-side fallback)
+      if (!currentAuthUser) {
+        let freePredictions = parseInt(localStorage.getItem("free_predictions") || "0", 10);
+        localStorage.setItem("free_predictions", freePredictions + 1);
+      }
+      hideLoading();
+      delete _pollRetries[jobId];
     } else {
-        showError("Unknown job status.");
-        hideLoading();
+      showError("Unexpected server response. Please try again.");
+      hideLoading();
+      delete _pollRetries[jobId];
     }
   } catch (err) {
-      showError("Lost connection while waiting for result.");
+    // Network error — retry a few times before giving up
+    _pollRetries[jobId]++;
+    if (_pollRetries[jobId] <= 3) {
+      updateLoadingText("Reconnecting…");
+      setTimeout(() => pollJobStatus(jobId), 2500);
+    } else {
+      showError("Lost connection to server. Please check your internet and try again.");
       hideLoading();
+      delete _pollRetries[jobId];
+    }
   }
 }
 

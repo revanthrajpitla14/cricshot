@@ -104,18 +104,20 @@ def run_inference(job_id, file_bytes, mode="image"):
         JOBS_STORE[job_id]["status"] = "done"
         JOBS_STORE[job_id]["result"] = result
 
+        # Read session info BEFORE the inner try so the except block can always access it
+        session_tok = JOBS_STORE[job_id].get("session_token")
+        user_uid    = JOBS_STORE[job_id].get("user_id")
+
         # Log to DB directly in this ephemeral thread
         try:
             from services import log_prediction
-            session_tok = JOBS_STORE[job_id].get("session_token")
-            user_uid    = JOBS_STORE[job_id].get("user_id")
             log_prediction(result, mode, session_token=session_tok, manual_user_id=user_uid)
         except Exception as e:
             # Trip the DB spillover logic
             spill_data = {
-                "result": result, 
-                "file_type": mode, 
-                "session_token": session_tok, 
+                "result": result,
+                "file_type": mode,
+                "session_token": session_tok,
                 "user_id": user_uid
             }
             FAILED_DB_WRITES.append(spill_data)
@@ -1020,9 +1022,14 @@ def check_status(job_id):
     job = JOBS_STORE.get(job_id)
 
     if not job:
-        return jsonify({"error": "Invalid job ID"}), 404
+        # Return 200 so the frontend can handle gracefully (server may have restarted)
+        return jsonify({"status": "not_found", "error": "Job not found or expired. Please try again."}), 200
 
-    return jsonify(job)
+    # Return only the fields the frontend needs; strip internal tracking fields
+    return jsonify({
+        "status": job.get("status"),
+        "result": job.get("result"),
+    }), 200
 
 
 
