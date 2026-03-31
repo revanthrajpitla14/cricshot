@@ -1025,7 +1025,13 @@ def api_predict_video():
     except Exception as e:
         return jsonify({"error": f"Server crash during submission: {str(e)}"}), 500
 
+def optional_exempt(f):
+    if HAS_LIMITER:
+        return limiter.exempt(f)
+    return f
+
 @app.route("/predict/status/<job_id>")
+@optional_exempt
 def check_status(job_id):
     job = JOBS_STORE.get(job_id)
 

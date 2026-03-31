@@ -143,9 +143,8 @@ def _gif_to_base64(frames_rgb: list) -> str:
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def predict_image(file_bytes: bytes) -> dict:
-    with _inference_lock:
-        clf, le = _load_model()
-        landmarker = _get_image_landmarker()
+    clf, le = _load_model()
+    landmarker = _get_image_landmarker()
 
     np_arr = np.frombuffer(file_bytes, np.uint8)
     img    = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -161,7 +160,9 @@ def predict_image(file_bytes: bytes) -> dict:
     h, w  = img.shape[:2]
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     mp_img  = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
-    result  = landmarker.detect(mp_img)
+    
+    with _inference_lock:
+        result  = landmarker.detect(mp_img)
 
     if not result.pose_landmarks:
         return {
@@ -190,9 +191,8 @@ def predict_image(file_bytes: bytes) -> dict:
 
 
 def predict_video(file_bytes: bytes) -> dict:
-    with _inference_lock:
-        clf, le = _load_model()
-        landmarker = _get_video_landmarker()
+    clf, le = _load_model()
+    landmarker = _get_video_landmarker()
 
     import tempfile
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
@@ -232,7 +232,8 @@ def predict_video(file_bytes: bytes) -> dict:
                 ts_ms   = int((frame_idx / fps) * 1000)
                 
                 try:
-                    result = landmarker.detect_for_video(mp_img, ts_ms)
+                    with _inference_lock:
+                        result = landmarker.detect_for_video(mp_img, ts_ms)
                     if result.pose_landmarks:
                         lm    = result.pose_landmarks[0]
                         feats = _landmarks_to_features(lm)
@@ -304,7 +305,8 @@ def predict_frame(base64_str: str) -> dict:
     h, w = img.shape[:2]
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
-    result = landmarker.detect(mp_img)
+    with _inference_lock:
+        result = landmarker.detect(mp_img)
 
     if not result.pose_landmarks:
         return {"error": "no_pose", "shot": None, "confidence": 0}
