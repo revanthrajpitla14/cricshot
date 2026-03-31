@@ -106,10 +106,10 @@ def run_inference(job_id, file_bytes, mode="image"):
 
         # Log to DB directly in this ephemeral thread
         try:
-            from app import _log_prediction # avoid circular if needed
+            from services import log_prediction
             session_tok = JOBS_STORE[job_id].get("session_token")
             user_uid    = JOBS_STORE[job_id].get("user_id")
-            _log_prediction(result, mode, session_token=session_tok, manual_user_id=user_uid)
+            log_prediction(result, mode, session_token=session_tok, manual_user_id=user_uid)
         except Exception as e:
             # Trip the DB spillover logic
             spill_data = {
@@ -138,6 +138,8 @@ def cleanup_jobs():
 def db_flusher_loop():
     """Background loop to safely drain FAILED_DB_WRITES to Turso without dropping API capability."""
     from turso_db import DB_DOWN_UNTIL
+    from services import log_prediction
+    
     while True:
         time.sleep(30)
         # Check circuit breaker before trying flush
@@ -154,7 +156,7 @@ def db_flusher_loop():
             
             for item in items:
                 try:
-                    _log_prediction(
+                    log_prediction(
                         item.get("result", {}), 
                         item.get("file_type", "image"), 
                         session_token=item.get("session_token"),
@@ -921,35 +923,6 @@ def _check_anon_quota():
             "message": f"You have used all {FREE_PREDICTION_LIMIT} free predictions. Please sign in."
         }), 403)
     return True, None
-
-
-def _log_prediction(result: dict, file_type: str, session_token: str = None, manual_user_id: int = None):
-    """Persist a Prediction row after a successful inference. Protected against DB Outages."""
-    from sqlalchemy.exc import SQLAlchemyError
-    try:
-        pred = Prediction(
-            user_id          = manual_user_id,
-            session_token    = session_token if not manual_user_id else None,
-            shot_name        = result.get("shot", "Unknown"),
-            confidence       = result.get("confidence", 0.0),
-            file_type        = file_type,
-            frame_count      = result.get("frame_count"),
-            frames_processed = result.get("frames_processed"),
-            ip_address       = "127.0.0.1", # Hardcoded or safe string as request context is lost in threads
-        )
-        db.session.add(pred)
-
-        # Increment anonymous quota safely
-        if not manual_user_id and session_token:
-            anon = AnonymousSession.query.filter_by(session_token=session_token).first()
-            if anon:
-                anon.prediction_count += 1
-                anon.last_used = datetime.datetime.now(datetime.timezone.utc)
-
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        raise e  # Let the run_inference thread catch this and push it to FAILED_DB_WRITES
 
 
 @app.route("/predict/image", methods=["POST"])
