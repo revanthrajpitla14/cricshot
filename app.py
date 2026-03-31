@@ -39,43 +39,134 @@ from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
 
-# ── Lazy predict wrappers ──────────────────────────────────────────────────────
-# predict.py imports cv2, numpy, mediapipe, PIL, sklearn at module level — those
-# libraries take 10-40 s to load and would block Gunicorn from binding the port.
-# Instead we import the module on the FIRST actual prediction request.
-_predict_module = None
-_predict_load_error = None
+import threading
+import uuid
+import time
+import json
+import os
 
-def _load_predict():
-    global _predict_module, _predict_load_error
-    if _predict_module is not None:
-        return True
-    if _predict_load_error is not None:
-        return False
+JOBS_STORE = {}
+FAILED_DB_WRITES = []
+FAILED_DB_FILE = "failed_writes.json"
+
+# Startup recovery for Failed Writes (Disk Spillover)
+if os.path.exists(FAILED_DB_FILE):
     try:
-        import predict as _pm
-        _predict_module = _pm
-        print("[predict] Module loaded successfully on first request.", flush=True)
-        return True
-    except Exception as _e:
-        _predict_load_error = str(_e)
-        print(f"[WARN] predict.py failed to import: {_e}", flush=True)
-        return False
+        with open(FAILED_DB_FILE, "r") as f:
+            FAILED_DB_WRITES.extend(json.load(f))
+        print(f"[Core] Recovered {len(FAILED_DB_WRITES)} unlogged predictions from disk.")
+    except Exception as e:
+        print(f"[Core WARNING] Failed to parse failed_writes.json: {e}")
 
-def predict_image(b):
-    if not _load_predict():
-        return {"error": "Prediction module unavailable on this server."}
-    return _predict_module.predict_image(b)
-
-def predict_video(b):
-    if not _load_predict():
-        return {"error": "Prediction module unavailable on this server."}
-    return _predict_module.predict_video(b)
+def persist_failed_write(data):
+    try:
+        existing = []
+        if os.path.exists(FAILED_DB_FILE):
+            try:
+                with open(FAILED_DB_FILE, "r") as f:
+                    existing = json.load(f)
+            except Exception:
+                pass
+        existing.append(data)
+        with open(FAILED_DB_FILE, "w") as f:
+            json.dump(existing, f)
+    except Exception:
+        pass  # strictly never crash
 
 def predict_frame(b):
-    if not _load_predict():
-        return {"error": "Prediction module unavailable on this server."}
-    return _predict_module.predict_frame(b)
+    # Frames stay synchronous for minimal latency webcam feed (small images, instant).
+    import predict
+    return predict.predict_frame(b)
+
+def warmup_model():
+    try:
+        from predict import predict_image
+        print("[Warmup] Loading model in background...", flush=True)
+        predict_image(b"test")  # dummy call
+        print("[Warmup] Model ready.", flush=True)
+    except Exception as e:
+        print(f"[Warmup ERROR] {e}", flush=True)
+
+threading.Thread(target=warmup_model, daemon=True).start()
+
+def run_inference(job_id, file_bytes, mode="image"):
+    try:
+        if mode == "image":
+            from predict import predict_image
+            result = predict_image(file_bytes)
+        elif mode == "video":
+            from predict import predict_video
+            result = predict_video(file_bytes)
+        else:
+            result = {"error": "Invalid mode"}
+
+        # Store for the frontend immediately
+        JOBS_STORE[job_id]["status"] = "done"
+        JOBS_STORE[job_id]["result"] = result
+
+        # Log to DB directly in this ephemeral thread
+        try:
+            from app import _log_prediction # avoid circular if needed
+            session_tok = JOBS_STORE[job_id].get("session_token")
+            user_uid    = JOBS_STORE[job_id].get("user_id")
+            _log_prediction(result, mode, session_token=session_tok, manual_user_id=user_uid)
+        except Exception as e:
+            # Trip the DB spillover logic
+            spill_data = {
+                "result": result, 
+                "file_type": mode, 
+                "session_token": session_tok, 
+                "user_id": user_uid
+            }
+            FAILED_DB_WRITES.append(spill_data)
+            persist_failed_write(spill_data)
+
+    except Exception as e:
+        JOBS_STORE[job_id]["status"] = "error"
+        JOBS_STORE[job_id]["result"] = {"error": str(e)}
+
+def cleanup_jobs():
+    """Garbage collector designed strictly to prevent memory starvation on the free tier."""
+    while True:
+        time.sleep(120)  # Check every 2 minutes
+        current_time = time.time()
+        for job_id in list(JOBS_STORE.keys()):
+            # Safe TTL: Purge any job older than 10 minutes whether read or unread
+            if current_time - JOBS_STORE[job_id].get("created_at", current_time) > 600:
+                del JOBS_STORE[job_id]
+
+def db_flusher_loop():
+    """Background loop to safely drain FAILED_DB_WRITES to Turso without dropping API capability."""
+    from turso_db import DB_DOWN_UNTIL
+    while True:
+        time.sleep(30)
+        # Check circuit breaker before trying flush
+        if time.time() > DB_DOWN_UNTIL and FAILED_DB_WRITES:
+            items = list(FAILED_DB_WRITES)
+            FAILED_DB_WRITES.clear()
+            
+            # Wipe JSON state because we are attempting them all now
+            try:
+                if os.path.exists(FAILED_DB_FILE):
+                    with open(FAILED_DB_FILE, "w") as f:
+                        json.dump([], f)
+            except Exception: pass
+            
+            for item in items:
+                try:
+                    _log_prediction(
+                        item.get("result", {}), 
+                        item.get("file_type", "image"), 
+                        session_token=item.get("session_token"),
+                        manual_user_id=item.get("user_id")
+                    )
+                except Exception as e:
+                    # Append it back
+                    FAILED_DB_WRITES.append(item)
+                    persist_failed_write(item)
+
+threading.Thread(target=cleanup_jobs, daemon=True).start()
+threading.Thread(target=db_flusher_loop, daemon=True).start()
 
 import json
 
@@ -832,31 +923,33 @@ def _check_anon_quota():
     return True, None
 
 
-def _log_prediction(result: dict, file_type: str, session_token: str = None):
-    """Persist a Prediction row after a successful inference."""
+def _log_prediction(result: dict, file_type: str, session_token: str = None, manual_user_id: int = None):
+    """Persist a Prediction row after a successful inference. Protected against DB Outages."""
+    from sqlalchemy.exc import SQLAlchemyError
     try:
         pred = Prediction(
-            user_id          = current_user.id if current_user.is_authenticated else None,
-            session_token    = None if current_user.is_authenticated else session_token,
+            user_id          = manual_user_id,
+            session_token    = session_token if not manual_user_id else None,
             shot_name        = result.get("shot", "Unknown"),
             confidence       = result.get("confidence", 0.0),
             file_type        = file_type,
             frame_count      = result.get("frame_count"),
             frames_processed = result.get("frames_processed"),
-            ip_address       = get_client_ip(),
+            ip_address       = "127.0.0.1", # Hardcoded or safe string as request context is lost in threads
         )
         db.session.add(pred)
 
-        # Increment anonymous quota
-        if not current_user.is_authenticated and session_token:
+        # Increment anonymous quota safely
+        if not manual_user_id and session_token:
             anon = AnonymousSession.query.filter_by(session_token=session_token).first()
             if anon:
                 anon.prediction_count += 1
                 anon.last_used = datetime.datetime.now(datetime.timezone.utc)
 
         db.session.commit()
-    except Exception:
-        db.session.rollback()  # DB might be locked — prediction still returns
+    except Exception as e:
+        db.session.rollback()
+        raise e  # Let the run_inference thread catch this and push it to FAILED_DB_WRITES
 
 
 @app.route("/predict/image", methods=["POST"])
@@ -874,19 +967,30 @@ def api_predict_image():
         if not _allowed(file.filename, ALLOWED_IMAGE_EXT):
             return jsonify({"error": "Unsupported image format."}), 400
 
-        result = predict_image(file.read())
+        job_id = str(uuid.uuid4())
+        
+        token, _ = get_or_create_anon_session()
 
-        try:
-            token, _ = get_or_create_anon_session()
-            _log_prediction(result, "image", session_token=token)
-            resp = jsonify(result)
-            resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
-            return resp, 200
-        except Exception:
-            db.session.rollback()
-            return jsonify(result), 200  # return prediction even if DB logging fails
+        JOBS_STORE[job_id] = {
+            "status": "processing",
+            "result": None,
+            "created_at": time.time(),
+            "session_token": token,
+            "user_id": current_user.id if current_user.is_authenticated else None
+        }
+
+        threading.Thread(
+            target=run_inference,
+            args=(job_id, file.read(), "image"),
+            daemon=True
+        ).start()
+
+        return jsonify({
+            "job_id": job_id,
+            "status": "processing"
+        }), 202
     except Exception as e:
-        return jsonify({"error": f"Server crash during prediction: {str(e)}"}), 500
+        return jsonify({"error": f"Server crash during submission: {str(e)}"}), 500
 
 
 @app.route("/predict/video", methods=["POST"])
@@ -904,19 +1008,41 @@ def api_predict_video():
         if not _allowed(file.filename, ALLOWED_VIDEO_EXT):
             return jsonify({"error": "Unsupported video format."}), 400
 
-        result = predict_video(file.read())
+        job_id = str(uuid.uuid4())
+        
+        token, _ = get_or_create_anon_session()
 
-        try:
-            token, _ = get_or_create_anon_session()
-            _log_prediction(result, "video", session_token=token)
-            resp = jsonify(result)
-            resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
-            return resp, 200
-        except Exception:
-            db.session.rollback()
-            return jsonify(result), 200
+        JOBS_STORE[job_id] = {
+            "status": "processing",
+            "result": None,
+            "created_at": time.time(),
+            "session_token": token,
+            "user_id": current_user.id if current_user.is_authenticated else None
+        }
+
+        threading.Thread(
+            target=run_inference,
+            args=(job_id, file.read(), "video"),
+            daemon=True
+        ).start()
+
+        return jsonify({
+            "job_id": job_id,
+            "status": "processing"
+        }), 202
     except Exception as e:
-        return jsonify({"error": f"Server crash during prediction: {str(e)}"}), 500
+        return jsonify({"error": f"Server crash during submission: {str(e)}"}), 500
+
+@app.route("/predict/status/<job_id>")
+def check_status(job_id):
+    job = JOBS_STORE.get(job_id)
+
+    if not job:
+        return jsonify({"error": "Invalid job ID"}), 404
+
+    return jsonify(job)
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1396,5 +1522,6 @@ def metrics():
 if __name__ == '__main__':
     # Render sets the PORT environment variable automatically
     import os
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

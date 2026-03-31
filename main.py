@@ -26,14 +26,14 @@ from flask_bcrypt import Bcrypt
 # (defined in app.py — main.py is a clean route-only layer)
 from app import (
     app, db, bcrypt,
-    User, Prediction, ShotType, ActivityLog, AnonymousSession,
     login_manager, mail,
     generate_otp, send_otp, log_activity,
-    predict_image, predict_video, predict_frame,
+    predict_frame,
     _check_anon_quota, _log_prediction, _allowed,
     get_or_create_anon_session,
     ALLOWED_IMAGE_EXT, ALLOWED_VIDEO_EXT,
     BASE_DIR, TEMPLATES_DIR, STATIC_DIR,
+    JOBS_STORE, run_inference
 )
 
 # ════════════════════════════════════════════════════════════════════
@@ -261,55 +261,68 @@ def me():
 # ════════════════════════════════════════════════════════════════════
 
 @app.route("/predict/image", methods=["POST"])
-def api_predict_image():
-    """Predict cricket shot from an uploaded image file."""
-    allowed, err_resp = _check_anon_quota()
-    if not allowed:
-        return err_resp
-
-    if "file" not in request.files or request.files["file"].filename == "":
-        return jsonify({"error": "No image file provided."}), 400
+def route_api_predict_image():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
-    if not _allowed(file.filename, ALLOWED_IMAGE_EXT):
-        return jsonify({"error": "Unsupported image format. Use JPG, PNG, or WEBP."}), 400
+    file_bytes = file.read()
 
-    result = predict_image(file.read())
-    try:
-        token, _ = get_or_create_anon_session()
-        _log_prediction(result, "image", session_token=token)
-        resp = jsonify(result)
-        resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
-        return resp, 200
-    except Exception:
-        db.session.rollback()
-        return jsonify(result), 200
+    job_id = str(uuid.uuid4())
+
+    JOBS_STORE[job_id] = {
+        "status": "processing",
+        "result": None
+    }
+
+    import threading
+    threading.Thread(
+        target=run_inference,
+        args=(job_id, file_bytes, "image"),
+        daemon=True
+    ).start()
+
+    return jsonify({
+        "job_id": job_id,
+        "status": "processing"
+    })
 
 
 @app.route("/predict/video", methods=["POST"])
-def api_predict_video():
-    """Predict dominant cricket shot from an uploaded video file."""
-    allowed, err_resp = _check_anon_quota()
-    if not allowed:
-        return err_resp
-
-    if "file" not in request.files or request.files["file"].filename == "":
-        return jsonify({"error": "No video file provided."}), 400
+def route_api_predict_video():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
-    if not _allowed(file.filename, ALLOWED_VIDEO_EXT):
-        return jsonify({"error": "Unsupported video format. Use MP4, AVI, or MOV."}), 400
+    file_bytes = file.read()
 
-    result = predict_video(file.read())
-    try:
-        token, _ = get_or_create_anon_session()
-        _log_prediction(result, "video", session_token=token)
-        resp = jsonify(result)
-        resp.set_cookie("anon_session", token, max_age=60*60*24*30, samesite="Lax")
-        return resp, 200
-    except Exception:
-        db.session.rollback()
-        return jsonify(result), 200
+    job_id = str(uuid.uuid4())
+
+    JOBS_STORE[job_id] = {
+        "status": "processing",
+        "result": None
+    }
+
+    import threading
+    threading.Thread(
+        target=run_inference,
+        args=(job_id, file_bytes, "video"),
+        daemon=True
+    ).start()
+
+    return jsonify({
+        "job_id": job_id,
+        "status": "processing"
+    })
+
+@app.route("/predict/status/<job_id>")
+def route_check_status(job_id):
+    job = JOBS_STORE.get(job_id)
+
+    if not job:
+        return jsonify({"error": "Invalid job ID"}), 404
+
+    return jsonify(job)
 
 
 @app.route("/predict/frame", methods=["POST"])

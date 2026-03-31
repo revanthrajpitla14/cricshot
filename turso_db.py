@@ -19,6 +19,10 @@ import json
 import requests
 
 
+import time
+
+DB_DOWN_UNTIL = 0
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  PURE HTTP CLIENT (Replaces libsql_client to avoid asyncio/thread deadlocks)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -35,6 +39,10 @@ class TursoHttpClient:
         self.session = requests.Session()
 
     def execute(self, sql, params=None):
+        global DB_DOWN_UNTIL
+        if time.time() < DB_DOWN_UNTIL:
+            raise Exception("Turso Circuit Breaker ACTIVE: Pausing requests to prevent cascade.")
+
         payload = {
             "requests": [
                 {
@@ -48,48 +56,56 @@ class TursoHttpClient:
             ]
         }
 
-        try:
-            resp = self.session.post(
-                f"{self.url}/v2/pipeline",
-                json=payload,
-                headers=self.headers,
-                timeout=30
-            )
+        retries = 3
+        delay = 1
 
-            if resp.status_code == 401:
-                raise Exception("Turso: Unauthorized — check TURSO_AUTH_TOKEN")
-            if resp.status_code not in (200, 201):
-                raise Exception(f"Turso HTTP {resp.status_code}: {resp.text[:500]}")
-
-            data = resp.json()
-
-            # top-level error (e.g. bad request format)
-            if "error" in data and "results" not in data:
-                raise Exception(f"Turso top-level error: {data['error']}")
-
-            results = data.get("results", [])
-            if not results:
-                return {}  # DDL with no result set
-
-            result_obj = results[0]
-
-            # Pipeline-level error ─ type = "error"
-            if result_obj.get("type") == "error":
-                err = result_obj.get("error", {})
-                raise Exception(
-                    f"Turso SQL error [{err.get('code', '?')}]: {err.get('message', str(err))}"
-                    f"\n  SQL: {sql[:300]}"
+        for attempt in range(retries):
+            try:
+                resp = self.session.post(
+                    f"{self.url}/v2/pipeline",
+                    json=payload,
+                    headers=self.headers,
+                    timeout=10  # Reduced to 10s to gracefully fail fast
                 )
 
-            response = result_obj.get("response", {})
-            if "result" in response:
-                return response["result"]
+                if resp.status_code == 401:
+                    raise Exception("Turso: Unauthorized — check TURSO_AUTH_TOKEN")
+                if resp.status_code not in (200, 201):
+                    raise Exception(f"Turso HTTP {resp.status_code}: {resp.text[:500]}")
 
-            # close/non-execute response — DDL succeeded with no rows
-            return {}
+                data = resp.json()
 
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Turso network error: {e}")
+                # top-level error (e.g. bad request format)
+                if "error" in data and "results" not in data:
+                    raise Exception(f"Turso top-level error: {data['error']}")
+
+                results = data.get("results", [])
+                if not results:
+                    return {}  # DDL with no result set
+
+                result_obj = results[0]
+
+                # Pipeline-level error ─ type = "error"
+                if result_obj.get("type") == "error":
+                    err = result_obj.get("error", {})
+                    raise Exception(
+                        f"Turso SQL error [{err.get('code', '?')}]: {err.get('message', str(err))}"
+                        f"\n  SQL: {sql[:300]}"
+                    )
+
+                response = result_obj.get("response", {})
+                if "result" in response:
+                    return response["result"]
+
+                # close/non-execute response — DDL succeeded with no rows
+                return {}
+
+            except requests.exceptions.RequestException as e:
+                if attempt == retries - 1:
+                    DB_DOWN_UNTIL = time.time() + 30  # Trip Circuit Breaker
+                    raise Exception(f"Turso network error (Circuit tripped for 30s): {e}")
+                time.sleep(delay)
+                delay *= 2
 
 
     def close(self):

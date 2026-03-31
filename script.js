@@ -624,6 +624,10 @@ function hideLoading() {
   btnPredict.disabled = false;
 }
 
+function updateLoadingText(text) {
+  btnText.textContent = text;
+}
+
 function showError(msg) {
   emptyState.style.display = "none";
   loadingState.style.display = "none";
@@ -739,10 +743,8 @@ btnPredict.addEventListener("click", async () => {
       credentials: 'include'
     });
 
-    // Check if response is JSON before parsing (cold-start Render returns HTML 502)
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
-      // Server returned HTML (e.g. 502 gateway page from Render cold start)
       showError("Server is starting up — please wait 30 seconds and try again.");
       hideLoading();
       return;
@@ -758,7 +760,6 @@ btnPredict.addEventListener("click", async () => {
     }
 
     if (!response.ok) {
-      // Handle free limit reached
       if (data.error === "free_limit_reached") {
         showError("You've used all 3 free predictions. Please sign in to continue.");
         showAuthView("login");
@@ -766,34 +767,80 @@ btnPredict.addEventListener("click", async () => {
       } else {
         showError(data.error || `Server error (${response.status}).`);
       }
-    } else if (data.error && !data.annotated_image && !data.shot) {
-      // Pure error with no usable result
-      showError(data.error);
-    } else {
-      renderResult(data, currentMode === "video");
-
-      // If there was a partial error (no skeleton detected) show message in result
-      if (data.error && !data.annotated_image) {
-        document.getElementById("no-skeleton-result").style.display = "block";
-        document.getElementById("annotated-image-result").style.display = "none";
-      }
-
-      // Increment free predictions counter (client-side fallback)
-      if (!currentAuthUser) {
-        let freePredictions = parseInt(localStorage.getItem("free_predictions") || "0", 10);
-        localStorage.setItem("free_predictions", freePredictions + 1);
-      }
+      hideLoading();
+      return;
     }
+
+    if (data.error) {
+      showError(data.error);
+      hideLoading();
+      return;
+    }
+
+    // NEW ASYNC FLOW: Poll for job completion
+    const jobId = data.job_id;
+    if (!jobId) {
+       // Fallback to synchronous handling just in case the backend hasn't updated yet
+       renderResult(data, currentMode === "video");
+       hideLoading();
+       return;
+    }
+
+    pollJobStatus(jobId);
+
   } catch (err) {
     if (err.name === "TypeError" || err.message?.includes("fetch")) {
       showError("Cannot connect to server. Make sure the Flask server is running on port 5000.");
     } else {
       showError(`Unexpected error: ${err.message}`);
     }
-  } finally {
     hideLoading();
   }
 });
+
+async function pollJobStatus(jobId) {
+  try {
+    const response = await fetch(`${API_BASE}/predict/status/${jobId}`);
+    if (!response.ok) {
+        showError("Failed to fetch job status.");
+        hideLoading();
+        return;
+    }
+    const data = await response.json();
+    
+    if (data.status === "queued") {
+        updateLoadingText("Queued...");
+        setTimeout(() => pollJobStatus(jobId), 1500);
+    } else if (data.status === "processing") {
+        updateLoadingText("Analysing...");
+        setTimeout(() => pollJobStatus(jobId), 1500);
+    } else if (data.status === "error") {
+        showError(data.result?.error || "Inference failed.");
+        hideLoading();
+    } else if (data.status === "done") {
+        const result = data.result;
+        renderResult(result, currentMode === "video");
+        
+        if (result.error && !result.annotated_image) {
+            document.getElementById("no-skeleton-result").style.display = "block";
+            document.getElementById("annotated-image-result").style.display = "none";
+        }
+
+        // Increment free predictions counter (client-side fallback)
+        if (!currentAuthUser) {
+            let freePredictions = parseInt(localStorage.getItem("free_predictions") || "0", 10);
+            localStorage.setItem("free_predictions", freePredictions + 1);
+        }
+        hideLoading();
+    } else {
+        showError("Unknown job status.");
+        hideLoading();
+    }
+  } catch (err) {
+      showError("Lost connection while waiting for result.");
+      hideLoading();
+  }
+}
 
 // ─── Initial State ──────────────────────────────────────────────────────────
 async function checkSystemHealth() {
